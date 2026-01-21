@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Google Sheets Viewer</title>
+    <style>
+        body {
+            background:#020617;
+            color:#e5e7eb;
+            font-family:Arial;
+            padding:20px;
+        }
+        select, button {
+            padding:8px;
+            margin:5px;
+            border-radius:6px;
+        }
+        table {
+            width:100%;
+            border-collapse:collapse;
+            margin-top:20px;
+        }
+        th, td {
+            border:1px solid #334155;
+            padding:8px;
+            font-size:14px;
+        }
+        th {
+            background:#0f172a;
+            color:#38bdf8;
+        }
+        tr:nth-child(even){
+            background:#020617;
+        }
+    </style>
+</head>
+<body>
+
+<h2>🔥 Google Sheets en Web</h2>
+
+<form method="get">
+    <label>Tab:</label>
+    <select name="tab" onchange="this.form.submit()">
+        {% for t in tabs %}
+            <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+    </select>
+
+    <label>Branch:</label>
+    <select name="branch" onchange="this.form.submit()">
+        {% for b in branches %}
+            <option value="{{ b }}" {% if b == selected_branch %}selected{% endif %}>{{ b }}</option>
+        {% endfor %}
+    </select>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            {% for h in headers %}
+                <th>{{ h }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+            <tr>
+                {% for cell in row %}
+                    <td>{{ cell }}</td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+</body>
+</html>
