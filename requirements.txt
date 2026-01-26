@@ -1,4 +1,6 @@
 flask
-requests
-pandas
 gunicorn
+pandas
+requests
+gspread
+google-auth
