@@ -17,6 +17,7 @@
             display: flex;
             gap: 15px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
         select {
             padding: 6px;
@@ -49,6 +50,7 @@
 <h1>Consulta de Servicios</h1>
 
 <form method="get" class="filters">
+
     <div>
         <label>TAB</label><br>
         <select name="tab" onchange="this.form.submit()">
@@ -70,6 +72,18 @@
             {% endfor %}
         </select>
     </div>
+
+    <div>
+        <label>CONTRATA</label><br>
+        <select name="contrata" onchange="this.form.submit()">
+            {% for c in contratas %}
+                <option value="{{ c }}" {% if c == selected_contrata %}selected{% endif %}>
+                    {{ c }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
 </form>
 
 <div class="count">
@@ -97,4 +111,3 @@
 
 </body>
 </html>
-

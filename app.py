@@ -46,6 +46,7 @@ def load_sheet(sheet_name):
 def index():
     tab = request.args.get("tab", TABS[0])
     branch = request.args.get("branch", "ALL")
+    contrata = request.args.get("contrata", "ALL")
 
     load_sheet(tab)
 
@@ -54,34 +55,52 @@ def index():
             "index.html",
             tabs=TABS,
             branches=["ALL"],
+            contratas=["ALL"],
             selected_tab=tab,
             selected_branch=branch,
+            selected_contrata=contrata,
             headers=[],
             rows=[]
         )
 
-    # 🔵 Filtrado por BRANCH
     df = all_rows.copy()
-    branch_column = df.columns[0]
 
+    # 🔵 Columnas clave
+    branch_col = df.columns[0]      # BRANCH
+    contrata_col = "CONTRATA"       # nombre exacto de la columna
+
+    # 🔵 Filtro BRANCH
     if branch != "ALL":
-        df = df[df[branch_column] == branch]
+        df = df[df[branch_col] == branch]
 
-    # 🔥 BRANCH dinámico desde el Sheet
-    branches = sorted(all_rows[branch_column].dropna().unique().tolist())
+    # 🔵 Filtro CONTRATA
+    if contrata != "ALL" and contrata_col in df.columns:
+        df = df[df[contrata_col] == contrata]
+
+    # 🔥 BRANCH dinámico
+    branches = sorted(all_rows[branch_col].dropna().unique().tolist())
     branches.insert(0, "ALL")
+
+    # 🔥 CONTRATA dinámico
+    if contrata_col in all_rows.columns:
+        contratas = sorted(all_rows[contrata_col].dropna().unique().tolist())
+        contratas.insert(0, "ALL")
+    else:
+        contratas = ["ALL"]
 
     return render_template(
         "index.html",
         tabs=TABS,
         branches=branches,
+        contratas=contratas,
         selected_tab=tab,
         selected_branch=branch,
+        selected_contrata=contrata,
         headers=df.columns,
         rows=df.values
     )
 
-# ⚠️ IMPORTANTE: sin debug en producción
+# ⚠️ SIN debug en producción
 if __name__ == "__main__":
     app.run()
 
