@@ -2,10 +2,13 @@ from flask import Flask, render_template, request
 import gspread
 from google.oauth2.service_account import Credentials
 import os
+import re
 
 app = Flask(__name__)
 
-# --- Google Sheets config ---
+# =====================
+# GOOGLE SHEETS CONFIG
+# =====================
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 
@@ -28,27 +31,61 @@ creds = Credentials.from_service_account_info(
 gc = gspread.authorize(creds)
 sheet = gc.open_by_key(SPREADSHEET_ID)
 
+# =====================
+# UTIL: coordenadas → link
+# =====================
+def coord_to_link(value):
+    if not value:
+        return None
+
+    value = str(value).strip()
+    value = re.sub(r"\s+", "", value)  # quita TODOS los espacios
+
+    if "," not in value:
+        return None
+
+    try:
+        lat, lon = value.split(",", 1)
+        float(lat)
+        float(lon)
+        return f"https://www.google.com/maps?q={lat},{lon}"
+    except:
+        return None
+
+
 @app.route("/")
 def index():
     tabs = [ws.title for ws in sheet.worksheets()]
-
     selected_tab = request.args.get("tab", tabs[0])
-    ws = sheet.worksheet(selected_tab)
 
+    ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
+
+    if len(data) < 2:
+        return render_template("index.html", tabs=tabs, selected_tab=selected_tab)
+
     headers = data[0]
     rows = data[1:]
 
+    # =====================
     # Detectar columnas
+    # =====================
     def col_index(name):
         return headers.index(name) if name in headers else None
 
     branch_idx = col_index("BRANCH")
     contrata_idx = col_index("CONTRATA")
 
-    branches = sorted(set(r[branch_idx] for r in rows if branch_idx is not None and r[branch_idx]))
-    contratas = sorted(set(r[contrata_idx] for r in rows if contrata_idx is not None and r[contrata_idx]))
+    # Coordenadas (automático)
+    coord_idx = None
+    for i, h in enumerate(headers):
+        if any(k in h.upper() for k in ["COORD", "GPS", "UBIC"]):
+            coord_idx = i
+            break
 
+    # =====================
+    # Filtros
+    # =====================
     selected_branch = request.args.get("branch", "")
     selected_contrata = request.args.get("contrata", "")
 
@@ -58,12 +95,21 @@ def index():
     if selected_contrata and contrata_idx is not None:
         rows = [r for r in rows if r[contrata_idx] == selected_contrata]
 
-    # Detectar columna de coordenadas
-    coord_col = None
-    for h in headers:
-        if "COORD" in h.upper() or "GPS" in h.upper() or "UBIC" in h.upper():
-            coord_col = h
-            break
+    # =====================
+    # Listas dinámicas
+    # =====================
+    branches = sorted({r[branch_idx] for r in data[1:] if branch_idx is not None and r[branch_idx]})
+    contratas = sorted({r[contrata_idx] for r in data[1:] if contrata_idx is not None and r[contrata_idx]})
+
+    # =====================
+    # Links de mapas
+    # =====================
+    map_links = []
+    if coord_idx is not None:
+        for r in rows:
+            map_links.append(coord_to_link(r[coord_idx]))
+    else:
+        map_links = [None] * len(rows)
 
     return render_template(
         "index.html",
@@ -75,8 +121,11 @@ def index():
         contratas=contratas,
         selected_branch=selected_branch,
         selected_contrata=selected_contrata,
-        coord_col=coord_col,
+        coord_idx=coord_idx,
+        map_links=map_links,
     )
+
 
 if __name__ == "__main__":
     app.run(debug=True)
+
