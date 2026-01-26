@@ -10,9 +10,6 @@
             font-family: Arial, sans-serif;
             padding: 20px;
         }
-        h1 {
-            margin-bottom: 10px;
-        }
         .filters {
             display: flex;
             gap: 15px;
@@ -31,17 +28,12 @@
         th, td {
             border: 1px solid #334155;
             padding: 6px;
-            text-align: left;
         }
         th {
             background: #1e293b;
         }
         tr:nth-child(even) {
             background: #020617;
-        }
-        .count {
-            margin-bottom: 10px;
-            font-size: 14px;
         }
         a {
             color: #38bdf8;
@@ -62,9 +54,9 @@
         <label>TAB</label><br>
         <select name="tab" onchange="this.form.submit()">
             {% for t in tabs %}
-                <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>
-                    {{ t }}
-                </option>
+            <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>
+                {{ t }}
+            </option>
             {% endfor %}
         </select>
     </div>
@@ -72,10 +64,11 @@
     <div>
         <label>BRANCH</label><br>
         <select name="branch" onchange="this.form.submit()">
+            <option value="">Todos</option>
             {% for b in branches %}
-                <option value="{{ b }}" {% if b == selected_branch %}selected{% endif %}>
-                    {{ b }}
-                </option>
+            <option value="{{ b }}" {% if b == selected_branch %}selected{% endif %}>
+                {{ b }}
+            </option>
             {% endfor %}
         </select>
     </div>
@@ -83,49 +76,31 @@
     <div>
         <label>CONTRATA</label><br>
         <select name="contrata" onchange="this.form.submit()">
+            <option value="">Todos</option>
             {% for c in contratas %}
-                <option value="{{ c }}" {% if c == selected_contrata %}selected{% endif %}>
-                    {{ c }}
-                </option>
+            <option value="{{ c }}" {% if c == selected_contrata %}selected{% endif %}>
+                {{ c }}
+            </option>
             {% endfor %}
         </select>
     </div>
 
 </form>
 
-<div class="count">
-    Resultados: <strong>{{ rows|length }}</strong>
-</div>
+<p>Resultados: <strong>{{ rows|length }}</strong></p>
 
 <table>
-    <thead>
-        <tr>
-            {% for h in headers %}
-                <th>{{ h }}</th>
-            {% endfor %}
-        </tr>
-    </thead>
+<thead>
+<tr>
+    {% for h in headers %}
+    <th>{{ h }}</th>
+    {% endfor %}
+</tr>
+</thead>
 
-    <tbody>
-        {% for row in rows %}
-        <tr>
-            {% for cell in row %}
-                <td>
-                    {% if coord_col 
-                          and headers[loop.index0] == coord_col 
-                          and cell 
-                          and "google.com/maps" in cell %}
-                        <a href="{{ cell }}" target="_blank">Ver mapa</a>
-                    {% else %}
-                        {{ cell }}
-                    {% endif %}
-                </td>
-            {% endfor %}
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-</body>
-</html>
+<tbody>
+{% for row in rows %}
+<tr>
+    {% for cell in row %}
+    <td>
 

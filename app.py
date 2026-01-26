@@ -1,127 +1,82 @@
-import requests
-import pandas as pd
-from urllib.parse import quote
 from flask import Flask, render_template, request
+import gspread
+from google.oauth2.service_account import Credentials
+import os
 
 app = Flask(__name__)
 
-# =====================
-# CONFIGURACIÓN
-# =====================
-SHEET_ID = "1eaNxCpm8JF1JcZS3_ldwMRINGYFaW6RsQQWybvRi_P8"
-API_KEY = "AIzaSyBbU7VsAR3M3VADQ3aFxBVto86M1k6EMuY"
+# --- Google Sheets config ---
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 
-TABS = [
-    "GARANTIAS LIMA",
-    "ONLINE LIMA",
-    "GARANTIAS PROVINCIA",
-    "FUERA DE GARANTÍA PROVINCIA",
-    "CANCELADOS",
-    "PENDIENTES ODN"   # 🆕 NUEVO TAB
-]
+creds = Credentials.from_service_account_info(
+    {
+        "type": "service_account",
+        "project_id": os.environ.get("GCP_PROJECT_ID"),
+        "private_key_id": os.environ.get("GCP_PRIVATE_KEY_ID"),
+        "private_key": os.environ.get("GCP_PRIVATE_KEY").replace("\\n", "\n"),
+        "client_email": os.environ.get("GCP_CLIENT_EMAIL"),
+        "client_id": os.environ.get("GCP_CLIENT_ID"),
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": os.environ.get("GCP_CLIENT_CERT_URL"),
+    },
+    scopes=SCOPES,
+)
 
-all_rows = pd.DataFrame()
+gc = gspread.authorize(creds)
+sheet = gc.open_by_key(SPREADSHEET_ID)
 
-# =====================
-# CARGAR SHEET
-# =====================
-def load_sheet(sheet_name):
-    global all_rows
-
-    encoded_name = quote(sheet_name)
-    url = f"https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}/values/{encoded_name}?key={API_KEY}"
-    data = requests.get(url).json()
-
-    if "values" not in data or len(data["values"]) < 2:
-        all_rows = pd.DataFrame()
-        return
-
-    headers = data["values"][0]
-    rows = data["values"][1:]
-    all_rows = pd.DataFrame(rows, columns=headers)
-
-# =====================
-# WEB
-# =====================
-@app.route("/", methods=["GET"])
+@app.route("/")
 def index():
-    tab = request.args.get("tab", TABS[0])
-    branch = request.args.get("branch", "ALL")
-    contrata = request.args.get("contrata", "ALL")
+    tabs = [ws.title for ws in sheet.worksheets()]
 
-    load_sheet(tab)
+    selected_tab = request.args.get("tab", tabs[0])
+    ws = sheet.worksheet(selected_tab)
 
-    if all_rows.empty:
-        return render_template(
-            "index.html",
-            tabs=TABS,
-            branches=["ALL"],
-            contratas=["ALL"],
-            selected_tab=tab,
-            selected_branch=branch,
-            selected_contrata=contrata,
-            headers=[],
-            rows=[],
-            coord_col=""
-        )
+    data = ws.get_all_values()
+    headers = data[0]
+    rows = data[1:]
 
-    df = all_rows.copy()
+    # Detectar columnas
+    def col_index(name):
+        return headers.index(name) if name in headers else None
 
-    # =====================
-    # COLUMNAS
-    # =====================
-    branch_col = "BRANCH"
-    contrata_col = "CONTRATA"
-    coord_col = "COORDENADAS"
+    branch_idx = col_index("BRANCH")
+    contrata_idx = col_index("CONTRATA")
 
-    # =====================
-    # FILTROS
-    # =====================
-    if branch != "ALL" and branch_col in df.columns:
-        df = df[df[branch_col] == branch]
+    branches = sorted(set(r[branch_idx] for r in rows if branch_idx is not None and r[branch_idx]))
+    contratas = sorted(set(r[contrata_idx] for r in rows if contrata_idx is not None and r[contrata_idx]))
 
-    if contrata != "ALL" and contrata_col in df.columns:
-        df = df[df[contrata_col] == contrata]
+    selected_branch = request.args.get("branch", "")
+    selected_contrata = request.args.get("contrata", "")
 
-    # =====================
-    # DESPLEGABLES DINÁMICOS
-    # =====================
-    branches = ["ALL"]
-    if branch_col in all_rows.columns:
-        branches += sorted(all_rows[branch_col].dropna().unique().tolist())
+    if selected_branch and branch_idx is not None:
+        rows = [r for r in rows if r[branch_idx] == selected_branch]
 
-    contratas = ["ALL"]
-    if contrata_col in all_rows.columns:
-        contratas += sorted(all_rows[contrata_col].dropna().unique().tolist())
+    if selected_contrata and contrata_idx is not None:
+        rows = [r for r in rows if r[contrata_idx] == selected_contrata]
 
-    # =====================
-    # COORDENADAS → GOOGLE MAPS
-    # =====================
-    def coord_to_link(value):
-        if pd.isna(value):
-            return ""
-        value = str(value).strip()
-        if "," in value:
-            return f"https://www.google.com/maps?q={value}"
-        return value
-
-    if coord_col in df.columns:
-        df[coord_col] = df[coord_col].apply(coord_to_link)
+    # Detectar columna de coordenadas
+    coord_col = None
+    for h in headers:
+        if "COORD" in h.upper() or "GPS" in h.upper() or "UBIC" in h.upper():
+            coord_col = h
+            break
 
     return render_template(
         "index.html",
-        tabs=TABS,
+        tabs=tabs,
+        selected_tab=selected_tab,
+        headers=headers,
+        rows=rows,
         branches=branches,
         contratas=contratas,
-        selected_tab=tab,
-        selected_branch=branch,
-        selected_contrata=contrata,
-        headers=df.columns.tolist(),
-        rows=df.values.tolist(),
-        coord_col=coord_col
+        selected_branch=selected_branch,
+        selected_contrata=selected_contrata,
+        coord_col=coord_col,
     )
 
 if __name__ == "__main__":
-    app.run()
-
-
+    app.run(debug=True)
