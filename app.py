@@ -19,23 +19,21 @@ TABS = [
     "CANCELADOS"
 ]
 
-BRANCHES = {
-    "LIMA": ["ALL", "LI1", "LI2", "LI3", "LI4", "LI7"],
-    "PROVINCIA": ["ALL", "ARE", "CUS", "CAJ", "HUN", "JUN", "LAL", "PIU", "SAN"]
-}
-
-headers = []
 all_rows = pd.DataFrame()
 
 # =====================
 # CARGAR SHEET
 # =====================
 def load_sheet(sheet_name):
-    global headers, all_rows
+    global all_rows
 
     encoded_name = quote(sheet_name)
     url = f"https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}/values/{encoded_name}?key={API_KEY}"
     data = requests.get(url).json()
+
+    if "values" not in data or len(data["values"]) < 2:
+        all_rows = pd.DataFrame()
+        return
 
     headers = data["values"][0]
     rows = data["values"][1:]
@@ -46,16 +44,32 @@ def load_sheet(sheet_name):
 # =====================
 @app.route("/", methods=["GET"])
 def index():
-    tab = request.args.get("tab", "GARANTIAS LIMA")
+    tab = request.args.get("tab", TABS[0])
     branch = request.args.get("branch", "ALL")
 
     load_sheet(tab)
 
-    df = all_rows
-    if branch != "ALL":
-        df = df[df[df.columns[0]] == branch]
+    if all_rows.empty:
+        return render_template(
+            "index.html",
+            tabs=TABS,
+            branches=["ALL"],
+            selected_tab=tab,
+            selected_branch=branch,
+            headers=[],
+            rows=[]
+        )
 
-    branches = BRANCHES["LIMA"] if "LIMA" in tab else BRANCHES["PROVINCIA"]
+    # 🔵 Filtrado por BRANCH
+    df = all_rows.copy()
+    branch_column = df.columns[0]
+
+    if branch != "ALL":
+        df = df[df[branch_column] == branch]
+
+    # 🔥 BRANCH dinámico desde el Sheet
+    branches = sorted(all_rows[branch_column].dropna().unique().tolist())
+    branches.insert(0, "ALL")
 
     return render_template(
         "index.html",
@@ -67,7 +81,8 @@ def index():
         rows=df.values
     )
 
-# ⚠️ IMPORTANTE: SIN debug
+# ⚠️ IMPORTANTE: sin debug en producción
 if __name__ == "__main__":
     app.run()
+
 

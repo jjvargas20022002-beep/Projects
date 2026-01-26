@@ -2,57 +2,79 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Google Sheets Viewer</title>
+    <title>Consulta Sheets</title>
     <style>
         body {
-            background:#020617;
-            color:#e5e7eb;
-            font-family:Arial;
-            padding:20px;
+            background: #0f172a;
+            color: #e5e7eb;
+            font-family: Arial, sans-serif;
+            padding: 20px;
         }
-        select, button {
-            padding:8px;
-            margin:5px;
-            border-radius:6px;
+        h1 {
+            margin-bottom: 10px;
+        }
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        select {
+            padding: 6px;
+            font-size: 14px;
         }
         table {
-            width:100%;
-            border-collapse:collapse;
-            margin-top:20px;
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
         }
         th, td {
-            border:1px solid #334155;
-            padding:8px;
-            font-size:14px;
+            border: 1px solid #334155;
+            padding: 6px;
+            text-align: left;
         }
         th {
-            background:#0f172a;
-            color:#38bdf8;
+            background: #1e293b;
         }
-        tr:nth-child(even){
-            background:#020617;
+        tr:nth-child(even) {
+            background: #020617;
+        }
+        .count {
+            margin-bottom: 10px;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
 
-<h2>🔥 Google Sheets en Web</h2>
+<h1>Consulta de Servicios</h1>
 
-<form method="get">
-    <label>Tab:</label>
-    <select name="tab" onchange="this.form.submit()">
-        {% for t in tabs %}
-            <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>{{ t }}</option>
-        {% endfor %}
-    </select>
+<form method="get" class="filters">
+    <div>
+        <label>TAB</label><br>
+        <select name="tab" onchange="this.form.submit()">
+            {% for t in tabs %}
+                <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>
+                    {{ t }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
 
-    <label>Branch:</label>
-    <select name="branch" onchange="this.form.submit()">
-        {% for b in branches %}
-            <option value="{{ b }}" {% if b == selected_branch %}selected{% endif %}>{{ b }}</option>
-        {% endfor %}
-    </select>
+    <div>
+        <label>BRANCH</label><br>
+        <select name="branch" onchange="this.form.submit()">
+            {% for b in branches %}
+                <option value="{{ b }}" {% if b == selected_branch %}selected{% endif %}>
+                    {{ b }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
 </form>
+
+<div class="count">
+    Resultados: <strong>{{ rows|length }}</strong>
+</div>
 
 <table>
     <thead>
@@ -75,3 +97,4 @@
 
 </body>
 </html>
+
