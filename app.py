@@ -32,14 +32,14 @@ gc = gspread.authorize(creds)
 sheet = gc.open_by_key(SPREADSHEET_ID)
 
 # =====================
-# UTIL: coordenadas → link
+# UTIL: coordenadas → link Google Maps
 # =====================
 def coord_to_link(value):
     if not value:
         return None
 
     value = str(value).strip()
-    value = re.sub(r"\s+", "", value)  # quita TODOS los espacios
+    value = re.sub(r"\s+", "", value)  # elimina TODOS los espacios
 
     if "," not in value:
         return None
@@ -56,58 +56,69 @@ def coord_to_link(value):
 @app.route("/")
 def index():
     tabs = [ws.title for ws in sheet.worksheets()]
-    selected_tab = request.args.get("tab", tabs[0])
+
+    selected_tab = request.args.get("tab")
+    if not selected_tab or selected_tab not in tabs:
+        selected_tab = tabs[0]
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
 
-    if len(data) < 2:
-        return render_template("index.html", tabs=tabs, selected_tab=selected_tab)
+    # Si la hoja está vacía
+    if not data or len(data) < 2:
+        return render_template(
+            "index.html",
+            tabs=tabs,
+            selected_tab=selected_tab,
+            headers=[],
+            rows=[],
+            branches=[],
+            contratas=[],
+            selected_branch="",
+            selected_contrata="",
+            coord_idx=None,
+            map_links=[],
+        )
 
     headers = data[0]
     rows = data[1:]
 
-    # =====================
-    # Detectar columnas
-    # =====================
     def col_index(name):
         return headers.index(name) if name in headers else None
 
     branch_idx = col_index("BRANCH")
     contrata_idx = col_index("CONTRATA")
 
-    # Coordenadas (automático)
+    # Detectar columna de coordenadas
     coord_idx = None
     for i, h in enumerate(headers):
         if any(k in h.upper() for k in ["COORD", "GPS", "UBIC"]):
             coord_idx = i
             break
 
-    # =====================
-    # Filtros
-    # =====================
     selected_branch = request.args.get("branch", "")
     selected_contrata = request.args.get("contrata", "")
 
     if selected_branch and branch_idx is not None:
-        rows = [r for r in rows if r[branch_idx] == selected_branch]
+        rows = [r for r in rows if len(r) > branch_idx and r[branch_idx] == selected_branch]
 
     if selected_contrata and contrata_idx is not None:
-        rows = [r for r in rows if r[contrata_idx] == selected_contrata]
+        rows = [r for r in rows if len(r) > contrata_idx and r[contrata_idx] == selected_contrata]
 
-    # =====================
-    # Listas dinámicas
-    # =====================
-    branches = sorted({r[branch_idx] for r in data[1:] if branch_idx is not None and r[branch_idx]})
-    contratas = sorted({r[contrata_idx] for r in data[1:] if contrata_idx is not None and r[contrata_idx]})
+    branches = (
+        sorted({r[branch_idx] for r in data[1:] if branch_idx is not None and len(r) > branch_idx and r[branch_idx]})
+        if branch_idx is not None else []
+    )
 
-    # =====================
-    # Links de mapas
-    # =====================
+    contratas = (
+        sorted({r[contrata_idx] for r in data[1:] if contrata_idx is not None and len(r) > contrata_idx and r[contrata_idx]})
+        if contrata_idx is not None else []
+    )
+
     map_links = []
     if coord_idx is not None:
         for r in rows:
-            map_links.append(coord_to_link(r[coord_idx]))
+            map_links.append(coord_to_link(r[coord_idx]) if len(r) > coord_idx else None)
     else:
         map_links = [None] * len(rows)
 
