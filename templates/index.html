@@ -105,15 +105,17 @@
             {% endfor %}
         </tr>
     </thead>
+
     <tbody>
         {% for row in rows %}
         <tr>
-            {% for cell, header in zip(row, headers) %}
+            {% for cell in row %}
                 <td>
-                    {% if header == coord_col and cell %}
-                        <a href="{{ cell }}" target="_blank">
-                            {{ cell }}
-                        </a>
+                    {% if coord_col 
+                          and headers[loop.index0] == coord_col 
+                          and cell 
+                          and "google.com/maps" in cell %}
+                        <a href="{{ cell }}" target="_blank">Ver mapa</a>
                     {% else %}
                         {{ cell }}
                     {% endif %}
