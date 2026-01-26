@@ -39,7 +39,7 @@ def coord_to_link(value):
         return None
 
     value = str(value).strip()
-    value = re.sub(r"\s+", "", value)  # elimina TODOS los espacios
+    value = re.sub(r"\s+", "", value)
 
     if "," not in value:
         return None
@@ -64,20 +64,18 @@ def index():
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
 
-    # Si la hoja está vacía
     if not data or len(data) < 2:
         return render_template(
             "index.html",
             tabs=tabs,
             selected_tab=selected_tab,
             headers=[],
-            rows=[],
+            rows_with_links=[],
             branches=[],
             contratas=[],
             selected_branch="",
             selected_contrata="",
             coord_idx=None,
-            map_links=[],
         )
 
     headers = data[0]
@@ -89,7 +87,6 @@ def index():
     branch_idx = col_index("BRANCH")
     contrata_idx = col_index("CONTRATA")
 
-    # Detectar columna de coordenadas
     coord_idx = None
     for i, h in enumerate(headers):
         if any(k in h.upper() for k in ["COORD", "GPS", "UBIC"]):
@@ -115,25 +112,22 @@ def index():
         if contrata_idx is not None else []
     )
 
-    map_links = []
-    if coord_idx is not None:
-        for r in rows:
-            map_links.append(coord_to_link(r[coord_idx]) if len(r) > coord_idx else None)
-    else:
-        map_links = [None] * len(rows)
+    rows_with_links = []
+    for r in rows:
+        link = coord_to_link(r[coord_idx]) if coord_idx is not None and len(r) > coord_idx else None
+        rows_with_links.append((r, link))
 
     return render_template(
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
         headers=headers,
-        rows=rows,
+        rows_with_links=rows_with_links,
         branches=branches,
         contratas=contratas,
         selected_branch=selected_branch,
         selected_contrata=selected_contrata,
         coord_idx=coord_idx,
-        map_links=map_links,
     )
 
 

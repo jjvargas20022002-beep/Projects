@@ -87,7 +87,7 @@
 
 </form>
 
-<p>Resultados: <strong>{{ rows|length }}</strong></p>
+<p>Resultados: <strong>{{ rows_with_links | length }}</strong></p>
 
 <table>
 <thead>
@@ -102,7 +102,7 @@
 </thead>
 
 <tbody>
-{% for row, link in zip(rows, map_links) %}
+{% for row, link in rows_with_links %}
 <tr>
     {% for cell in row %}
     <td>{{ cell }}</td>
@@ -124,4 +124,3 @@
 
 </body>
 </html>
-
