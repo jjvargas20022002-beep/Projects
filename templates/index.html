@@ -43,6 +43,10 @@
             margin-bottom: 10px;
             font-size: 14px;
         }
+        a.map-link {
+            color: #38bdf8;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -102,7 +106,21 @@
         {% for row in rows %}
             <tr>
                 {% for cell in row %}
-                    <td>{{ cell }}</td>
+                    <td>
+                        {% if cell
+                              and "," in cell
+                              and cell|replace(" ", "")|count(",") == 1 %}
+                            {% set coords = cell.replace(" ", "") %}
+                            <a
+                              class="map-link"
+                              href="https://www.google.com/maps?q={{ coords }}"
+                              target="_blank">
+                                {{ cell }}
+                            </a>
+                        {% else %}
+                            {{ cell }}
+                        {% endif %}
+                    </td>
                 {% endfor %}
             </tr>
         {% endfor %}
@@ -111,3 +129,4 @@
 
 </body>
 </html>
+
