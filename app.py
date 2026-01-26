@@ -16,7 +16,8 @@ TABS = [
     "ONLINE LIMA",
     "GARANTIAS PROVINCIA",
     "FUERA DE GARANTÍA PROVINCIA",
-    "CANCELADOS"
+    "CANCELADOS",
+    "PENDIENTES ODN"   # 🆕 NUEVO TAB
 ]
 
 all_rows = pd.DataFrame()
@@ -60,33 +61,52 @@ def index():
             selected_branch=branch,
             selected_contrata=contrata,
             headers=[],
-            rows=[]
+            rows=[],
+            coord_col=""
         )
 
     df = all_rows.copy()
 
-    # 🔵 Columnas clave
-    branch_col = df.columns[0]      # BRANCH
-    contrata_col = "CONTRATA"       # nombre exacto de la columna
+    # =====================
+    # COLUMNAS
+    # =====================
+    branch_col = "BRANCH"
+    contrata_col = "CONTRATA"
+    coord_col = "COORDENADAS"
 
-    # 🔵 Filtro BRANCH
-    if branch != "ALL":
+    # =====================
+    # FILTROS
+    # =====================
+    if branch != "ALL" and branch_col in df.columns:
         df = df[df[branch_col] == branch]
 
-    # 🔵 Filtro CONTRATA
     if contrata != "ALL" and contrata_col in df.columns:
         df = df[df[contrata_col] == contrata]
 
-    # 🔥 BRANCH dinámico
-    branches = sorted(all_rows[branch_col].dropna().unique().tolist())
-    branches.insert(0, "ALL")
+    # =====================
+    # DESPLEGABLES DINÁMICOS
+    # =====================
+    branches = ["ALL"]
+    if branch_col in all_rows.columns:
+        branches += sorted(all_rows[branch_col].dropna().unique().tolist())
 
-    # 🔥 CONTRATA dinámico
+    contratas = ["ALL"]
     if contrata_col in all_rows.columns:
-        contratas = sorted(all_rows[contrata_col].dropna().unique().tolist())
-        contratas.insert(0, "ALL")
-    else:
-        contratas = ["ALL"]
+        contratas += sorted(all_rows[contrata_col].dropna().unique().tolist())
+
+    # =====================
+    # COORDENADAS → GOOGLE MAPS
+    # =====================
+    def coord_to_link(value):
+        if pd.isna(value):
+            return ""
+        value = str(value).strip()
+        if "," in value:
+            return f"https://www.google.com/maps?q={value}"
+        return value
+
+    if coord_col in df.columns:
+        df[coord_col] = df[coord_col].apply(coord_to_link)
 
     return render_template(
         "index.html",
@@ -96,11 +116,11 @@ def index():
         selected_tab=tab,
         selected_branch=branch,
         selected_contrata=contrata,
-        headers=df.columns,
-        rows=df.values
+        headers=df.columns.tolist(),
+        rows=df.values.tolist(),
+        coord_col=coord_col
     )
 
-# ⚠️ SIN debug en producción
 if __name__ == "__main__":
     app.run()
 
