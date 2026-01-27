@@ -6,9 +6,6 @@ import re
 
 app = Flask(__name__)
 
-# =====================
-# GOOGLE SHEETS CONFIG
-# =====================
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 
@@ -32,22 +29,27 @@ gc = gspread.authorize(creds)
 sheet = gc.open_by_key(SPREADSHEET_ID)
 
 # =====================
-# UTIL: coordenadas → link Google Maps
+# TABs que usan Reporte de Contrata
 # =====================
+TABS_CON_REPORTE = {
+    "LI1 TGI",
+    "LI2 DIJUSA",
+    "LI2 ERAM",
+    "LI3 INTER",
+    "LI4 TGI",
+    "LI4 SMP",
+    "LI7 MARCOS",
+}
+
 def coord_to_link(value):
     if not value:
         return None
-
-    value = str(value).strip()
-    value = re.sub(r"\s+", "", value)
-
+    value = re.sub(r"\s+", "", str(value))
     if "," not in value:
         return None
-
     try:
         lat, lon = value.split(",", 1)
-        float(lat)
-        float(lon)
+        float(lat); float(lon)
         return f"https://www.google.com/maps?q={lat},{lon}"
     except:
         return None
@@ -56,60 +58,44 @@ def coord_to_link(value):
 @app.route("/")
 def index():
     tabs = [ws.title for ws in sheet.worksheets()]
-
-    selected_tab = request.args.get("tab")
-    if not selected_tab or selected_tab not in tabs:
-        selected_tab = tabs[0]
+    selected_tab = request.args.get("tab", tabs[0])
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
 
-    if not data or len(data) < 2:
-        return render_template(
-            "index.html",
-            tabs=tabs,
-            selected_tab=selected_tab,
-            headers=[],
-            rows_with_links=[],
-            branches=[],
-            contratas=[],
-            selected_branch="",
-            selected_contrata="",
-            coord_idx=None,
-        )
-
     headers = data[0]
     rows = data[1:]
 
-    def col_index(name):
+    def idx(name):
         return headers.index(name) if name in headers else None
 
-    branch_idx = col_index("BRANCH")
-    contrata_idx = col_index("CONTRATA")
+    branch_idx = idx("BRANCH")
+    contrata_idx = idx("CONTRATA")
+    reporte_idx = idx("Reporte de Contrata")
 
-    coord_idx = None
-    for i, h in enumerate(headers):
-        if any(k in h.upper() for k in ["COORD", "GPS", "UBIC"]):
-            coord_idx = i
-            break
+    coord_idx = next(
+        (i for i, h in enumerate(headers) if any(k in h.upper() for k in ["COORD", "GPS", "UBIC"])),
+        None
+    )
 
     selected_branch = request.args.get("branch", "")
     selected_contrata = request.args.get("contrata", "")
+    selected_reporte = request.args.get("reporte", "")
 
     if selected_branch and branch_idx is not None:
-        rows = [r for r in rows if len(r) > branch_idx and r[branch_idx] == selected_branch]
+        rows = [r for r in rows if r[branch_idx] == selected_branch]
 
     if selected_contrata and contrata_idx is not None:
-        rows = [r for r in rows if len(r) > contrata_idx and r[contrata_idx] == selected_contrata]
+        rows = [r for r in rows if r[contrata_idx] == selected_contrata]
 
-    branches = (
-        sorted({r[branch_idx] for r in data[1:] if branch_idx is not None and len(r) > branch_idx and r[branch_idx]})
-        if branch_idx is not None else []
-    )
+    if selected_reporte and reporte_idx is not None:
+        rows = [r for r in rows if r[reporte_idx] == selected_reporte]
 
-    contratas = (
-        sorted({r[contrata_idx] for r in data[1:] if contrata_idx is not None and len(r) > contrata_idx and r[contrata_idx]})
-        if contrata_idx is not None else []
+    branches = sorted({r[branch_idx] for r in data[1:] if branch_idx is not None and r[branch_idx]})
+    contratas = sorted({r[contrata_idx] for r in data[1:] if contrata_idx is not None and r[contrata_idx]})
+    reportes = (
+        sorted({r[reporte_idx] for r in data[1:] if reporte_idx is not None and r[reporte_idx]})
+        if selected_tab in TABS_CON_REPORTE else []
     )
 
     rows_with_links = []
@@ -123,14 +109,12 @@ def index():
         selected_tab=selected_tab,
         headers=headers,
         rows_with_links=rows_with_links,
+        coord_idx=coord_idx,
         branches=branches,
         contratas=contratas,
+        reportes=reportes,
         selected_branch=selected_branch,
         selected_contrata=selected_contrata,
-        coord_idx=coord_idx,
+        selected_reporte=selected_reporte,
+        show_reporte=selected_tab in TABS_CON_REPORTE,
     )
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
-
