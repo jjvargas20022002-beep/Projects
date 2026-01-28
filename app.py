@@ -18,7 +18,7 @@ SHEETS = {
     "ONLINE LIMA": "912345678"
 }
 
-SITE_ONLY_TABS = {
+FILTER_TABS = [
     "LI1 TGI",
     "LI2 DIJUSA",
     "LI2 ERAM",
@@ -27,60 +27,63 @@ SITE_ONLY_TABS = {
     "LI4 SMP",
     "LI7 MARCOS",
     "LI4 BROKERS"
-}
-
-NO_MAP_TABS = {"CANCELADOS", "ONLINE LIMA"}
+]
 
 @app.route("/")
 def index():
     selected_tab = request.args.get("tab", list(SHEETS.keys())[0])
-    gid = SHEETS[selected_tab]
+    site_filter = request.args.get("site", "")
+    reporte_filter = request.args.get("reporte", "")
 
+    gid = SHEETS.get(selected_tab)
     csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid={gid}"
+
     df = pd.read_csv(csv_url)
 
+    # Limpiar encabezados
     df.columns = df.columns.str.strip()
 
+    # Detectar columnas reales
+    has_coords = "Coordenadas" in df.columns
+    has_site = "SITE" in df.columns
+    has_reporte = "Reporte de Contrata" in df.columns
+
+    # Filtros SOLO si existen
+    if selected_tab in FILTER_TABS:
+        if has_site and site_filter:
+            df = df[df["SITE"] == site_filter]
+        if has_reporte and reporte_filter:
+            df = df[df["Reporte de Contrata"] == reporte_filter]
+
+    # Opciones de filtros
+    sites = sorted(df["SITE"].dropna().unique()) if has_site else []
+    reportes = sorted(df["Reporte de Contrata"].dropna().unique()) if has_reporte else []
+
     # MAPA
-    if "Coordenadas" in df.columns and selected_tab not in NO_MAP_TABS:
-        df["MAP_LINK"] = df["Coordenadas"].apply(
-            lambda x: f"https://www.google.com/maps?q={x}"
-            if pd.notna(x) and "," in str(x)
-            else ""
-        )
+    if has_coords:
+        def build_map(coord):
+            if isinstance(coord, str) and "," in coord:
+                lat, lon = coord.split(",")
+                return f"https://www.google.com/maps?q={lat.strip()},{lon.strip()}"
+            return None
+
+        df["MAP_LINK"] = df["Coordenadas"].apply(build_map)
     else:
-        df["MAP_LINK"] = ""
+        df["MAP_LINK"] = None
 
-    show_branch = selected_tab not in SITE_ONLY_TABS and "BRANCH" in df.columns
-    show_contrata = selected_tab not in SITE_ONLY_TABS and "CONTRATA" in df.columns
-
-    branch = request.args.get("branch")
-    contrata = request.args.get("contrata")
-
-    if branch:
-        df = df[df["BRANCH"] == branch]
-
-    if contrata:
-        df = df[df["CONTRATA"] == contrata]
-
-    branches = sorted(df["BRANCH"].dropna().unique()) if show_branch else []
-    contratas = sorted(df["CONTRATA"].dropna().unique()) if show_contrata else []
-
-    headers = [c for c in df.columns if c not in ["Coordenadas", "MAP_LINK"]]
-    rows = df.to_dict("records")
+    headers = [c for c in df.columns if c != "Coordenadas" and c != "MAP_LINK"]
 
     return render_template(
         "index.html",
         tabs=SHEETS.keys(),
         selected_tab=selected_tab,
-        branches=branches,
-        contratas=contratas,
-        selected_branch=branch,
-        selected_contrata=contrata,
-        show_branch=show_branch,
-        show_contrata=show_contrata,
         headers=headers,
-        rows=rows
+        rows=df.to_dict(orient="records"),
+        show_extra_filters=selected_tab in FILTER_TABS,
+        sites=sites,
+        reportes=reportes,
+        selected_site=site_filter,
+        selected_reporte=reporte_filter
     )
 
 if __name__ == "__main__":

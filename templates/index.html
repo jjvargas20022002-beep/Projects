@@ -5,14 +5,44 @@
 <title>WO Pendientes FTTH</title>
 
 <style>
-body { background:#0f172a; color:#e5e7eb; font-family:Arial; padding:20px }
-.filters { display:flex; gap:15px; flex-wrap:wrap; margin-bottom:20px }
-select { padding:6px }
-table { width:100%; border-collapse:collapse; font-size:13px }
-th,td { border:1px solid #334155; padding:6px }
-th { background:#1e293b }
-tr:nth-child(even){ background:#020617 }
-a { color:#38bdf8; text-decoration:none }
+body {
+  background:#0f172a;
+  color:#e5e7eb;
+  font-family:Arial;
+  padding:20px
+}
+h1 { margin-bottom:15px }
+.filters {
+  display:flex;
+  gap:15px;
+  flex-wrap:wrap;
+  margin-bottom:20px
+}
+select {
+  padding:6px;
+  background:#020617;
+  color:#e5e7eb;
+  border:1px solid #334155
+}
+table {
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px
+}
+th, td {
+  border:1px solid #334155;
+  padding:6px
+}
+th {
+  background:#1e293b
+}
+tr:nth-child(even){
+  background:#020617
+}
+a {
+  color:#38bdf8;
+  text-decoration:none
+}
 </style>
 </head>
 
@@ -22,28 +52,36 @@ a { color:#38bdf8; text-decoration:none }
 
 <form method="get" class="filters">
 
+<!-- SELECTOR DE TAB -->
 <select name="tab" onchange="this.form.submit()">
-{% for t in tabs %}
-<option value="{{t}}" {% if t==selected_tab %}selected{% endif %}>{{t}}</option>
-{% endfor %}
+  {% for t in tabs %}
+  <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>
+    {{ t }}
+  </option>
+  {% endfor %}
 </select>
 
-{% if show_branch %}
-<select name="branch" onchange="this.form.submit()">
-<option value="">BRANCH</option>
-{% for b in branches %}
-<option value="{{b}}" {% if b==selected_branch %}selected{% endif %}>{{b}}</option>
-{% endfor %}
-</select>
-{% endif %}
+<!-- FILTROS EXTRA SOLO EN TABS PERMITIDOS -->
+{% if show_extra_filters %}
 
-{% if show_contrata %}
-<select name="contrata" onchange="this.form.submit()">
-<option value="">CONTRATA</option>
-{% for c in contratas %}
-<option value="{{c}}" {% if c==selected_contrata %}selected{% endif %}>{{c}}</option>
-{% endfor %}
+<select name="site" onchange="this.form.submit()">
+  <option value="">SITE</option>
+  {% for s in sites %}
+  <option value="{{ s }}" {% if s == selected_site %}selected{% endif %}>
+    {{ s }}
+  </option>
+  {% endfor %}
 </select>
+
+<select name="reporte" onchange="this.form.submit()">
+  <option value="">REPORTE CONTRATA</option>
+  {% for r in reportes %}
+  <option value="{{ r }}" {% if r == selected_reporte %}selected{% endif %}>
+    {{ r }}
+  </option>
+  {% endfor %}
+</select>
+
 {% endif %}
 
 </form>
@@ -53,24 +91,26 @@ a { color:#38bdf8; text-decoration:none }
 <table>
 <thead>
 <tr>
-{% for h in headers %}
-<th>{{h}}</th>
-{% endfor %}
-<th>MAPA</th>
+  {% for h in headers %}
+  <th>{{ h }}</th>
+  {% endfor %}
+  <th>MAPA</th>
 </tr>
 </thead>
 
 <tbody>
 {% for row in rows %}
 <tr>
-{% for h in headers %}
-<td>{{ row[h] }}</td>
-{% endfor %}
-<td>
-{% if row.MAP_LINK %}
-<a href="{{ row.MAP_LINK }}" target="_blank">📍 Ver mapa</a>
-{% else %}—{% endif %}
-</td>
+  {% for h in headers %}
+  <td>{{ row[h] }}</td>
+  {% endfor %}
+  <td>
+    {% if row.MAP_LINK %}
+      <a href="{{ row.MAP_LINK }}" target="_blank">📍 Ver mapa</a>
+    {% else %}
+      —
+    {% endif %}
+  </td>
 </tr>
 {% endfor %}
 </tbody>
