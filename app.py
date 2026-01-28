@@ -51,6 +51,18 @@ def coord_to_link(value):
     except:
         return None
 
+
+def find_col(headers, expected_name):
+    """
+    Busca una columna ignorando mayúsculas, minúsculas y espacios
+    """
+    expected = expected_name.upper().replace(" ", "")
+    for i, h in enumerate(headers):
+        if h.upper().replace(" ", "") == expected:
+            return i
+    return None
+
+
 # =====================
 # ROUTES
 # =====================
@@ -67,47 +79,66 @@ def index():
 
     total_rows = len(rows_all)
 
-    def col(name):
-        return headers.index(name) if name in headers else None
-
-    # detectar columna de coordenadas
+    # =====================
+    # COORDENADAS
+    # =====================
     coord_idx = next(
         (i for i, h in enumerate(headers) if "COORD" in h.upper()),
         None
     )
 
-    # ===== COLUMNAS PARA FILTROS
+    # =====================
+    # COLUMNAS PARA FILTROS
+    # =====================
     if selected_tab in BRANCH_TABS:
-        col1_name, col2_name = "BRANCH", "CONTRATA"
+        col1_name = "BRANCH"
+        col2_name = "CONTRATA"
     else:
-        col1_name, col2_name = "SITE", "REPORTE CONTRATA"
+        col1_name = "SITE"
+        col2_name = "REPORTE CONTRATA"
 
-    col1_idx = col(col1_name)
-    col2_idx = col(col2_name)
+    col1_idx = find_col(headers, col1_name)
+    col2_idx = find_col(headers, col2_name)
 
-    # ===== VALORES PARA SELECTS
-    filters1 = sorted({r[col1_idx] for r in rows_all if col1_idx is not None and r[col1_idx]})
-    filters2 = sorted({r[col2_idx] for r in rows_all if col2_idx is not None and r[col2_idx]})
+    # =====================
+    # VALORES PARA SELECTS
+    # =====================
+    filters1 = sorted({
+        r[col1_idx].strip()
+        for r in rows_all
+        if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()
+    })
+
+    filters2 = sorted({
+        r[col2_idx].strip()
+        for r in rows_all
+        if col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip()
+    })
 
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
-    # ===== FILTRADO (SOLO TABLA)
+    # =====================
+    # FILTRADO (TABLA)
+    # =====================
     filtered_rows = []
     for r in rows_all:
-        if col1_idx is not None and selected_filter1 and r[col1_idx] != selected_filter1:
-            continue
-        if col2_idx is not None and selected_filter2 and r[col2_idx] != selected_filter2:
-            continue
+        if col1_idx is not None and selected_filter1:
+            if len(r) <= col1_idx or r[col1_idx] != selected_filter1:
+                continue
+
+        if col2_idx is not None and selected_filter2:
+            if len(r) <= col2_idx or r[col2_idx] != selected_filter2:
+                continue
+
         filtered_rows.append(r)
 
     filtered_count = len(filtered_rows)
 
     # =====================
-    # MAPA → TODAS LAS COORDENADAS (SIN FILTROS)
+    # MAPA (SIN FILTROS)
     # =====================
     all_coords = []
-
     if coord_idx is not None:
         for r in rows_all:
             if len(r) <= coord_idx:
@@ -118,17 +149,14 @@ def index():
                 continue
 
             try:
-                lat_str, lng_str = raw.replace(" ", "").split(",", 1)
-                lat = float(lat_str)
-                lng = float(lng_str)
-
+                lat, lng = map(float, raw.replace(" ", "").split(",", 1))
                 if -90 <= lat <= 90 and -180 <= lng <= 180:
                     all_coords.append({"lat": lat, "lng": lng})
             except:
                 continue
 
     # =====================
-    # OCULTAR COLUMNAS (COORD + LINK)
+    # OCULTAR COLUMNAS
     # =====================
     hidden_idxs = []
 
@@ -167,6 +195,7 @@ def index():
         total_rows=total_rows,
         filtered_count=filtered_count,
     )
+
 
 if __name__ == "__main__":
     app.run(debug=True)
