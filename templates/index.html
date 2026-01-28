@@ -3,35 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>Incidencias</title>
+
     <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-        .tabs button {
-            padding: 8px 12px;
-            margin-right: 5px;
-            cursor: pointer;
-        }
-        .tab-content {
-            display: none;
-            margin-top: 15px;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        details {
-            margin: 8px 0;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 5px;
-        }
-        th, td {
-            border: 1px solid #ccc;
-            padding: 6px;
-            text-align: left;
-        }
+        body { font-family: Arial, sans-serif; }
+        .tabs button { padding: 8px 12px; margin-right: 5px; cursor: pointer; }
+        .tab-content { display: none; margin-top: 15px; }
+        .tab-content.active { display: block; }
+        details { margin: 8px 0; }
+        table { border-collapse: collapse; width: 100%; margin-top: 5px; }
+        th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
         a.map-link {
             white-space: nowrap;
             text-decoration: none;
@@ -47,6 +27,7 @@
         }
     </script>
 </head>
+
 <body>
 
 <div class="tabs">
@@ -68,29 +49,33 @@
                 <details>
                     <summary>{{ subgroup }}</summary>
 
-                    <table>
-                        <tr>
-                            {% for key in rows[0].keys() %}
-                                <th>{{ key }}</th>
-                            {% endfor %}
-                        </tr>
+                    {% if rows %}
+                        <table>
+                            <tr>
+                                {% for key in rows[0].keys() %}
+                                    <th>{{ key }}</th>
+                                {% endfor %}
+                            </tr>
 
-                        {% for row in rows %}
-                        <tr>
-                            {% for key, value in row.items() %}
-                                {% if key == "MAP_LINK" and value %}
-                                    <td>
-                                        <a class="map-link" href="{{ value }}" target="_blank">
-                                            Ver mapa
-                                        </a>
-                                    </td>
-                                {% else %}
-                                    <td>{{ value }}</td>
-                                {% endif %}
+                            {% for row in rows %}
+                                <tr>
+                                    {% for key, value in row.items() %}
+                                        {% if key == "MAP_LINK" and value %}
+                                            <td>
+                                                <a class="map-link" href="{{ value }}" target="_blank">
+                                                    📍 Ver mapa
+                                                </a>
+                                            </td>
+                                        {% else %}
+                                            <td>{{ value }}</td>
+                                        {% endif %}
+                                    {% endfor %}
+                                </tr>
                             {% endfor %}
-                        </tr>
-                        {% endfor %}
-                    </table>
+                        </table>
+                    {% else %}
+                        <p>No hay registros</p>
+                    {% endif %}
 
                 </details>
             {% endfor %}
