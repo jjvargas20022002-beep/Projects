@@ -46,7 +46,7 @@ BRANCH_TABS = [
 # =====================
 def coord_to_link(value):
     try:
-        lat, lng = map(float, value.replace(" ", "").split(","))
+        lat, lng = map(float, value.replace(" ", "").split(",", 1))
         return f"https://www.google.com/maps?q={lat},{lng}"
     except:
         return None
@@ -56,8 +56,8 @@ def normalize(text):
     return (
         text.upper()
         .replace(" ", "")
-        .replace("DE", "")
         .replace("_", "")
+        .replace("DE", "")
     )
 
 
@@ -76,21 +76,15 @@ def find_col(headers, expected_name):
 
 
 # =====================
-# ROUTES
+# ROUTE
 # =====================
 @app.route("/")
 def index():
     tabs = [ws.title for ws in sheet.worksheets()]
     selected_tab = request.args.get("tab", tabs[0])
-    last_tab = request.args.get("last_tab", "")
 
-    # 🔴 RESET DE FILTROS SI CAMBIA EL TAB
-    if last_tab != selected_tab:
-        selected_filter1 = ""
-        selected_filter2 = ""
-    else:
-        selected_filter1 = request.args.get("filter1", "")
-        selected_filter2 = request.args.get("filter2", "")
+    selected_filter1 = request.args.get("filter1", "")
+    selected_filter2 = request.args.get("filter2", "")
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
@@ -137,24 +131,22 @@ def index():
     })
 
     # =====================
-    # FILTRADO (TABLA)
+    # FILTRADO TABLA
     # =====================
     filtered_rows = []
     for r in rows_all:
-        if col1_idx is not None and selected_filter1:
-            if len(r) <= col1_idx or r[col1_idx] != selected_filter1:
-                continue
+        if selected_filter1 and (len(r) <= col1_idx or r[col1_idx] != selected_filter1):
+            continue
 
-        if col2_idx is not None and selected_filter2:
-            if len(r) <= col2_idx or r[col2_idx] != selected_filter2:
-                continue
+        if selected_filter2 and (len(r) <= col2_idx or r[col2_idx] != selected_filter2):
+            continue
 
         filtered_rows.append(r)
 
     filtered_count = len(filtered_rows)
 
     # =====================
-    # MAPA (SIEMPRE TODAS LAS COORDENADAS)
+    # MAPA (TODAS LAS COORDENADAS)
     # =====================
     all_coords = []
     if coord_idx is not None:
@@ -201,7 +193,6 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab=selected_tab,  # 👈 CLAVE PARA RESET
         headers=visible_headers,
         rows_with_links=rows_with_links,
         has_coords=coord_idx is not None,
