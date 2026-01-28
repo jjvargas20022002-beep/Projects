@@ -18,27 +18,23 @@ TABS_SITE_ONLY = {
 def index():
     df = pd.read_csv("data.csv")
 
-    # 🔒 Asegurar columnas mínimas
-    for col in ["TAB", "SITE", "BRANCH", "CONTRATA", "LATITUDE", "LONGITUDE"]:
-        if col not in df.columns:
-            df[col] = ""
-
-    # 🔗 Google Maps
-    df["MAP_LINK"] = df.apply(
-        lambda r: f"https://www.google.com/maps?q={r['LATITUDE']},{r['LONGITUDE']}"
-        if pd.notna(r["LATITUDE"]) and pd.notna(r["LONGITUDE"]) and str(r["LATITUDE"]).strip() != ""
-        else "",
-        axis=1
-    )
+    # Crear link de Google Maps desde la columna "Coordenadas"
+    if "Coordenadas" in df.columns:
+        df["MAP_LINK"] = df["Coordenadas"].apply(
+            lambda x: f"https://www.google.com/maps?q={x}"
+            if pd.notna(x) and "," in str(x)
+            else ""
+        )
+    else:
+        df["MAP_LINK"] = ""
 
     tabs = sorted(df["TAB"].dropna().unique())
-
     data = {}
 
     for tab in tabs:
         tab_df = df[df["TAB"] == tab]
 
-        # 👉 SOLO SITE
+        # Tabs que SOLO muestran SITE
         if tab in TABS_SITE_ONLY:
             grouped = {
                 "SITE": {
@@ -46,8 +42,6 @@ def index():
                     for site in sorted(tab_df["SITE"].dropna().unique())
                 }
             }
-
-        # 👉 BRANCH / CONTRATA
         else:
             grouped = {
                 "BRANCH": {
