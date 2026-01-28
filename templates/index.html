@@ -62,31 +62,31 @@ a {
 </select>
 
 <!-- FILTROS EXTRA SOLO EN TABS PERMITIDOS -->
-{% if show_extra_filters %}
-
-<select name="site" onchange="this.form.submit()">
+{% if branches %}
+<select name="branch" onchange="this.form.submit()">
   <option value="">SITE</option>
-  {% for s in sites %}
-  <option value="{{ s }}" {% if s == selected_site %}selected{% endif %}>
+  {% for s in branches %}
+  <option value="{{ s }}" {% if s == selected_branch %}selected{% endif %}>
     {{ s }}
   </option>
   {% endfor %}
 </select>
+{% endif %}
 
-<select name="reporte" onchange="this.form.submit()">
+{% if contratas %}
+<select name="contrata" onchange="this.form.submit()">
   <option value="">REPORTE CONTRATA</option>
-  {% for r in reportes %}
-  <option value="{{ r }}" {% if r == selected_reporte %}selected{% endif %}>
+  {% for r in contratas %}
+  <option value="{{ r }}" {% if r == selected_contrata %}selected{% endif %}>
     {{ r }}
   </option>
   {% endfor %}
 </select>
-
 {% endif %}
 
 </form>
 
-<p>Resultados: {{ rows|length }}</p>
+<p>Resultados: {{ rows_with_links|length }}</p>
 
 <table>
 <thead>
@@ -99,14 +99,14 @@ a {
 </thead>
 
 <tbody>
-{% for row in rows %}
+{% for row, link in rows_with_links %}
 <tr>
-  {% for h in headers %}
-  <td>{{ row[h] }}</td>
+  {% for i in range(headers|length) %}
+  <td>{{ row[i] if i < row|length else '' }}</td>
   {% endfor %}
   <td>
-    {% if row.MAP_LINK %}
-      <a href="{{ row.MAP_LINK }}" target="_blank">📍 Ver mapa</a>
+    {% if link %}
+      <a href="{{ link }}" target="_blank">📍 Ver mapa</a>
     {% else %}
       —
     {% endif %}
