@@ -46,7 +46,7 @@ BRANCH_TABS = [
 # =====================
 def coord_to_link(value):
     try:
-        lat, lng = map(float, value.split(","))
+        lat, lng = map(float, value.replace(" ", "").split(","))
         return f"https://www.google.com/maps?q={lat},{lng}"
     except:
         return None
@@ -63,14 +63,14 @@ def index():
     data = ws.get_all_values()
 
     headers = data[0]
-    rows_all = data[1:]  # TODAS las filas
+    rows_all = data[1:]
 
-    total_rows = len(rows_all)  # 👈 TOTAL GENERAL
+    total_rows = len(rows_all)
 
     def col(name):
         return headers.index(name) if name in headers else None
 
-    # detectar columna de coordenadas (COORDENADAS, COORD, etc)
+    # detectar columna de coordenadas
     coord_idx = next(
         (i for i, h in enumerate(headers) if "COORD" in h.upper()),
         None
@@ -85,14 +85,14 @@ def index():
     col1_idx = col(col1_name)
     col2_idx = col(col2_name)
 
-    # ===== VALORES PARA COMBOS
+    # ===== VALORES PARA SELECTS
     filters1 = sorted({r[col1_idx] for r in rows_all if col1_idx is not None and r[col1_idx]})
     filters2 = sorted({r[col2_idx] for r in rows_all if col2_idx is not None and r[col2_idx]})
 
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
-    # ===== FILTRADO SOLO PARA TABLA
+    # ===== FILTRADO (SOLO TABLA)
     filtered_rows = []
     for r in rows_all:
         if col1_idx is not None and selected_filter1 and r[col1_idx] != selected_filter1:
@@ -101,33 +101,53 @@ def index():
             continue
         filtered_rows.append(r)
 
-    filtered_count = len(filtered_rows)  # 👈 TOTAL FILTRADO
+    filtered_count = len(filtered_rows)
 
     # =====================
     # MAPA → TODAS LAS COORDENADAS (SIN FILTROS)
     # =====================
     all_coords = []
+
     if coord_idx is not None:
         for r in rows_all:
-            if len(r) > coord_idx and r[coord_idx]:
-                try:
-                    lat, lng = map(float, r[coord_idx].strip().split(","))
+            if len(r) <= coord_idx:
+                continue
+
+            raw = r[coord_idx].strip()
+            if not raw or "," not in raw:
+                continue
+
+            try:
+                lat_str, lng_str = raw.replace(" ", "").split(",", 1)
+                lat = float(lat_str)
+                lng = float(lng_str)
+
+                if -90 <= lat <= 90 and -180 <= lng <= 180:
                     all_coords.append({"lat": lat, "lng": lng})
-                except:
-                    pass  # ignora coordenadas inválidas
+            except:
+                continue
 
     # =====================
-    # TABLA SIN COLUMNA COORDENADAS
+    # OCULTAR COLUMNAS (COORD + LINK)
     # =====================
-    visible_headers = (
-        headers[:coord_idx] + headers[coord_idx + 1 :]
-        if coord_idx is not None
-        else headers
-    )
+    hidden_idxs = []
+
+    if coord_idx is not None:
+        hidden_idxs.append(coord_idx)
+
+    for i, h in enumerate(headers):
+        if "LINK" in h.upper():
+            hidden_idxs.append(i)
+
+    hidden_idxs = sorted(set(hidden_idxs))
+
+    visible_headers = [
+        h for i, h in enumerate(headers) if i not in hidden_idxs
+    ]
 
     rows_with_links = []
     for r in filtered_rows:
-        row_visible = r[:coord_idx] + r[coord_idx + 1 :] if coord_idx is not None else r
+        row_visible = [c for i, c in enumerate(r) if i not in hidden_idxs]
         link = coord_to_link(r[coord_idx]) if coord_idx is not None else None
         rows_with_links.append((row_visible, link))
 
@@ -144,8 +164,8 @@ def index():
         filters2=filters2,
         selected_filter1=selected_filter1,
         selected_filter2=selected_filter2,
-        total_rows=total_rows,          # 👈 TOTAL GENERAL
-        filtered_count=filtered_count,  # 👈 TOTAL FILTRADO
+        total_rows=total_rows,
+        filtered_count=filtered_count,
     )
 
 if __name__ == "__main__":
