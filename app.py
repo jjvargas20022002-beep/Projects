@@ -11,16 +11,23 @@ TABS_SITE_ONLY = {
     "LI4 TGI",
     "LI4 SMP",
     "LI7 MARCOS",
-    "LI4 BROKERS"   # 👈 MUY IMPORTANTE
+    "LI4 BROKERS"
 }
 
 @app.route("/")
 def index():
     df = pd.read_csv("data.csv")
 
+    # 🔒 Asegurar columnas mínimas
+    for col in ["TAB", "SITE", "BRANCH", "CONTRATA", "LATITUDE", "LONGITUDE"]:
+        if col not in df.columns:
+            df[col] = ""
+
+    # 🔗 Google Maps
     df["MAP_LINK"] = df.apply(
         lambda r: f"https://www.google.com/maps?q={r['LATITUDE']},{r['LONGITUDE']}"
-        if pd.notna(r.get("LATITUDE")) and pd.notna(r.get("LONGITUDE")) else "",
+        if pd.notna(r["LATITUDE"]) and pd.notna(r["LONGITUDE"]) and str(r["LATITUDE"]).strip() != ""
+        else "",
         axis=1
     )
 
@@ -31,7 +38,7 @@ def index():
     for tab in tabs:
         tab_df = df[df["TAB"] == tab]
 
-        # 👉 SOLO SITE (sin BRANCH / CONTRATA)
+        # 👉 SOLO SITE
         if tab in TABS_SITE_ONLY:
             grouped = {
                 "SITE": {
@@ -40,29 +47,22 @@ def index():
                 }
             }
 
-        # 👉 SOLO si EXISTEN las columnas
+        # 👉 BRANCH / CONTRATA
         else:
-            grouped = {}
-
-            if "BRANCH" in tab_df.columns:
-                grouped["BRANCH"] = {
+            grouped = {
+                "BRANCH": {
                     b: tab_df[tab_df["BRANCH"] == b].to_dict("records")
                     for b in sorted(tab_df["BRANCH"].dropna().unique())
-                }
-
-            if "CONTRATA" in tab_df.columns:
-                grouped["CONTRATA"] = {
+                },
+                "CONTRATA": {
                     c: tab_df[tab_df["CONTRATA"] == c].to_dict("records")
                     for c in sorted(tab_df["CONTRATA"].dropna().unique())
                 }
+            }
 
         data[tab] = grouped
 
-    return render_template(
-        "index.html",
-        tabs=tabs,
-        data=data
-    )
+    return render_template("index.html", tabs=tabs, data=data)
 
 if __name__ == "__main__":
     app.run(debug=True)
