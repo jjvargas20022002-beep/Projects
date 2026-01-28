@@ -11,8 +11,13 @@
         .tab-content.active { display: block; }
         details { margin: 8px 0; }
         table { border-collapse: collapse; width: 100%; margin-top: 5px; }
-        th, td { border: 1px solid #ccc; padding: 6px; }
-        a.map-link { white-space: nowrap; color: #0066cc; text-decoration: none; }
+        th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+        a.map-link {
+            white-space: nowrap;
+            text-decoration: none;
+            color: #0066cc;
+            font-weight: 500;
+        }
     </style>
 
     <script>
@@ -27,7 +32,9 @@
 
 <div class="tabs">
     {% for tab in tabs %}
-        <button onclick="showTab('{{ tab|replace(' ', '_') }}')">{{ tab }}</button>
+        <button onclick="showTab('{{ tab|replace(' ', '_') }}')">
+            {{ tab }}
+        </button>
     {% endfor %}
 </div>
 
@@ -42,7 +49,6 @@
                 <details>
                     <summary>{{ subgroup }}</summary>
 
-                    {% if rows %}
                     <table>
                         <tr>
                             {% for key in rows[0].keys() %}
@@ -56,7 +62,7 @@
                                 {% if key == "MAP_LINK" and value %}
                                     <td>
                                         <a class="map-link" href="{{ value }}" target="_blank">
-                                            📍 Ver mapa
+                                            Ver mapa
                                         </a>
                                     </td>
                                 {% else %}
@@ -66,9 +72,6 @@
                         </tr>
                         {% endfor %}
                     </table>
-                    {% else %}
-                        <p>No hay registros</p>
-                    {% endif %}
 
                 </details>
             {% endfor %}

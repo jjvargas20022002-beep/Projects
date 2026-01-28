@@ -3,7 +3,6 @@ import pandas as pd
 
 app = Flask(__name__)
 
-# Tabs que SOLO usan SITE
 TABS_SITE_ONLY = {
     "LI1 TGI",
     "LI2 DIJUSA",
@@ -18,15 +17,9 @@ TABS_SITE_ONLY = {
 def index():
     df = pd.read_csv("data.csv")
 
-    # Asegurar columnas necesarias
-    for col in ["LATITUDE", "LONGITUDE", "TAB", "SITE", "BRANCH", "CONTRATA"]:
-        if col not in df.columns:
-            df[col] = ""
-
-    # Link Google Maps
     df["MAP_LINK"] = df.apply(
         lambda r: f"https://www.google.com/maps?q={r['LATITUDE']},{r['LONGITUDE']}"
-        if str(r["LATITUDE"]).strip() != "" and str(r["LONGITUDE"]).strip() != ""
+        if pd.notna(r["LATITUDE"]) and pd.notna(r["LONGITUDE"])
         else "",
         axis=1
     )
@@ -38,14 +31,14 @@ def index():
         tab_df = df[df["TAB"] == tab]
 
         if tab in TABS_SITE_ONLY:
-            data[tab] = {
+            grouped = {
                 "SITE": {
                     site: tab_df[tab_df["SITE"] == site].to_dict("records")
                     for site in sorted(tab_df["SITE"].dropna().unique())
                 }
             }
         else:
-            data[tab] = {
+            grouped = {
                 "BRANCH": {
                     b: tab_df[tab_df["BRANCH"] == b].to_dict("records")
                     for b in sorted(tab_df["BRANCH"].dropna().unique())
@@ -55,6 +48,8 @@ def index():
                     for c in sorted(tab_df["CONTRATA"].dropna().unique())
                 }
             }
+
+        data[tab] = grouped
 
     return render_template("index.html", tabs=tabs, data=data)
 
