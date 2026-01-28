@@ -44,6 +44,16 @@ BRANCH_TABS = [
 # =====================
 # UTILS
 # =====================
+def normalize(text):
+    return text.strip().upper()
+
+def find_col(headers, name):
+    name = normalize(name)
+    for i, h in enumerate(headers):
+        if normalize(h) == name:
+            return i
+    return None
+
 def coord_to_link(value):
     try:
         lat, lng = map(float, value.split(","))
@@ -65,28 +75,29 @@ def index():
     headers = data[0]
     rows_all = data[1:]
 
-    def col(name):
-        return headers.index(name) if name in headers else None
+    # ===== COORDENADAS (aunque estén ocultas)
+    coord_idx = next(
+        (i for i, h in enumerate(headers) if "COORD" in normalize(h)),
+        None
+    )
 
-    coord_idx = next((i for i, h in enumerate(headers) if "COORD" in h.upper()), None)
-
-    # ===== COLUMNAS PARA FILTROS
+    # ===== COLUMNAS DE FILTRO
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
     else:
-        col1_name, col2_name = "SITE", "REPORTE CONTRATA"
+        col1_name, col2_name = "SITE", "REPORTE DE CONTRATA"
 
-    col1_idx = col(col1_name)
-    col2_idx = col(col2_name)
+    col1_idx = find_col(headers, col1_name)
+    col2_idx = find_col(headers, col2_name)
 
-    # ===== VALORES DE FILTROS
+    # ===== VALORES DE FILTRO
     filters1 = sorted({r[col1_idx] for r in rows_all if col1_idx is not None and r[col1_idx]})
     filters2 = sorted({r[col2_idx] for r in rows_all if col2_idx is not None and r[col2_idx]})
 
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
-    # ===== FILTRADO DE FILAS
+    # ===== FILTRADO DE TABLA
     filtered_rows = []
     for r in rows_all:
         if col1_idx is not None and selected_filter1 and r[col1_idx] != selected_filter1:
@@ -95,28 +106,31 @@ def index():
             continue
         filtered_rows.append(r)
 
-    # ===== MAPA: SOLO COORDENADAS FILTRADAS
+    # ===== MAPA → TODAS LAS COORDENADAS DEL TAB
     all_coords = []
     if coord_idx is not None:
-        for r in filtered_rows:
-            if len(r) > coord_idx:
+        for r in rows_all:
+            if len(r) > coord_idx and r[coord_idx]:
                 try:
                     lat, lng = map(float, r[coord_idx].split(","))
                     all_coords.append({"lat": lat, "lng": lng})
                 except:
                     pass
 
-    # ===== HEADERS SIN COLUMNA COORD
+    # ===== OCULTAR COLUMNA COORDENADAS
     visible_headers = (
         headers[:coord_idx] + headers[coord_idx + 1 :]
         if coord_idx is not None
         else headers
     )
 
-    # ===== FILAS + LINK MAPA
     rows_with_links = []
     for r in filtered_rows:
-        row_visible = r[:coord_idx] + r[coord_idx + 1 :] if coord_idx is not None else r
+        row_visible = (
+            r[:coord_idx] + r[coord_idx + 1 :]
+            if coord_idx is not None
+            else r
+        )
         link = coord_to_link(r[coord_idx]) if coord_idx is not None else None
         rows_with_links.append((row_visible, link))
 
