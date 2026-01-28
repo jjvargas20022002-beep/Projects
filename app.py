@@ -3,14 +3,13 @@ import pandas as pd
 
 app = Flask(__name__)
 
-# Tabs que SOLO usan SITE
 TABS_SITE_ONLY = {
     "LI1 TGI",
     "LI2 DIJUSA",
     "LI2 ERAM",
     "LI3 INTER",
     "LI4 TGI",
-    "LI4 BROKERS",   # ← ÚNICO CAMBIO AQUÍ
+    "LI4 SMP",
     "LI7 MARCOS"
 }
 
@@ -20,14 +19,13 @@ def index():
 
     df["MAP_LINK"] = df.apply(
         lambda r: f"https://www.google.com/maps?q={r['LATITUDE']},{r['LONGITUDE']}"
-        if pd.notna(r["LATITUDE"]) and pd.notna(r["LONGITUDE"])
-        else "",
+        if pd.notna(r["LATITUDE"]) and pd.notna(r["LONGITUDE"]) else "",
         axis=1
     )
 
     tabs = sorted(df["TAB"].dropna().unique())
-    data = {}
 
+    data = {}
     for tab in tabs:
         tab_df = df[df["TAB"] == tab]
 
@@ -52,7 +50,12 @@ def index():
 
         data[tab] = grouped
 
-    return render_template("index.html", tabs=tabs, data=data)
+    return render_template(
+        "index.html",
+        tabs=tabs,
+        data=data,
+        site_only_tabs=TABS_SITE_ONLY
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)
