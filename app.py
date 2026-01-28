@@ -52,14 +52,26 @@ def coord_to_link(value):
         return None
 
 
+def normalize(text):
+    return (
+        text.upper()
+        .replace(" ", "")
+        .replace("DE", "")
+        .replace("_", "")
+    )
+
+
 def find_col(headers, expected_name):
-    """
-    Busca una columna ignorando mayúsculas, minúsculas y espacios
-    """
-    expected = expected_name.upper().replace(" ", "")
+    expected = normalize(expected_name)
+
     for i, h in enumerate(headers):
-        if h.upper().replace(" ", "") == expected:
+        if normalize(h) == expected:
             return i
+
+    for i, h in enumerate(headers):
+        if expected in normalize(h):
+            return i
+
     return None
 
 
