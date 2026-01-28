@@ -1,9 +1,9 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 import pandas as pd
 
 app = Flask(__name__)
 
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1eaNxCpm8JF1JcZS3_ldwMRINGYFaW6RsQQWybvRi_P8/export?format=csv&gid=36214359"
+SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1eaNxCpm8JF1JcZS3_ldwMRINGYFaW6RsQQWybvRi_P8/export?format=csv&gid=36214359"
 
 TABS_SITE_ONLY = {
     "LI1 TGI",
@@ -16,53 +16,60 @@ TABS_SITE_ONLY = {
     "LI4 BROKERS"
 }
 
+TABS_NO_MAP = {"CANCELADOS", "ONLINE LIMA"}
+
 @app.route("/")
 def index():
-    df = pd.read_csv(SHEET_URL)
+    df = pd.read_csv(SHEET_CSV_URL)
 
-    # 🔒 Asegurar columnas mínimas
-    for col in ["TAB", "SITE", "BRANCH", "CONTRATA", "Coordenadas"]:
-        if col not in df.columns:
-            df[col] = ""
-
-    # 🔗 Google Maps desde "Coordenadas"
-    df["MAP_LINK"] = df["Coordenadas"].apply(
-        lambda x: f"https://www.google.com/maps?q={x}"
-        if pd.notna(x) and "," in str(x)
-        else ""
-    )
-
+    # TAB seleccionado
     tabs = sorted(df["TAB"].dropna().unique())
-    data = {}
+    selected_tab = request.args.get("tab", tabs[0])
 
-    for tab in tabs:
-        tab_df = df[df["TAB"] == tab]
+    df_tab = df[df["TAB"] == selected_tab]
 
-        if tab in TABS_SITE_ONLY:
-            grouped = {
-                "SITE": {
-                    site: tab_df[tab_df["SITE"] == site].to_dict("records")
-                    for site in sorted(tab_df["SITE"].dropna().unique())
-                }
-            }
-        else:
-            grouped = {}
+    # MAP LINK desde Coordenadas
+    if "Coordenadas" in df_tab.columns and selected_tab not in TABS_NO_MAP:
+        df_tab["MAP_LINK"] = df_tab["Coordenadas"].apply(
+            lambda x: f"https://www.google.com/maps?q={x}"
+            if pd.notna(x) and "," in str(x)
+            else ""
+        )
+    else:
+        df_tab["MAP_LINK"] = ""
 
-            if "BRANCH" in tab_df.columns:
-                grouped["BRANCH"] = {
-                    b: tab_df[tab_df["BRANCH"] == b].to_dict("records")
-                    for b in sorted(tab_df["BRANCH"].dropna().unique())
-                }
+    # Filtros
+    show_branch = selected_tab not in TABS_SITE_ONLY
+    show_contrata = selected_tab not in TABS_SITE_ONLY
 
-            if "CONTRATA" in tab_df.columns:
-                grouped["CONTRATA"] = {
-                    c: tab_df[tab_df["CONTRATA"] == c].to_dict("records")
-                    for c in sorted(tab_df["CONTRATA"].dropna().unique())
-                }
+    branches = sorted(df_tab["BRANCH"].dropna().unique()) if show_branch and "BRANCH" in df_tab.columns else []
+    contratas = sorted(df_tab["CONTRATA"].dropna().unique()) if show_contrata and "CONTRATA" in df_tab.columns else []
 
-        data[tab] = grouped
+    selected_branch = request.args.get("branch")
+    selected_contrata = request.args.get("contrata")
 
-    return render_template("index.html", tabs=tabs, data=data)
+    if selected_branch:
+        df_tab = df_tab[df_tab["BRANCH"] == selected_branch]
+
+    if selected_contrata:
+        df_tab = df_tab[df_tab["CONTRATA"] == selected_contrata]
+
+    headers = [c for c in df_tab.columns if c not in ["Coordenadas", "MAP_LINK"]]
+    rows = df_tab.to_dict("records")
+
+    return render_template(
+        "index.html",
+        tabs=tabs,
+        selected_tab=selected_tab,
+        branches=branches,
+        contratas=contratas,
+        selected_branch=selected_branch,
+        selected_contrata=selected_contrata,
+        show_branch=show_branch,
+        show_contrata=show_contrata,
+        headers=headers,
+        rows=rows
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)

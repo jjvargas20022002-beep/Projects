@@ -54,9 +54,7 @@ a { color:#38bdf8; text-decoration:none }
 <thead>
 <tr>
 {% for h in headers %}
-{% if h != "Coordenadas" %}
 <th>{{h}}</th>
-{% endif %}
 {% endfor %}
 <th>MAPA</th>
 </tr>
@@ -65,10 +63,8 @@ a { color:#38bdf8; text-decoration:none }
 <tbody>
 {% for row in rows %}
 <tr>
-{% for key, value in row.items() %}
-{% if key != "Coordenadas" and key != "MAP_LINK" %}
-<td>{{ value }}</td>
-{% endif %}
+{% for h in headers %}
+<td>{{ row[h] }}</td>
 {% endfor %}
 <td>
 {% if row.MAP_LINK %}
