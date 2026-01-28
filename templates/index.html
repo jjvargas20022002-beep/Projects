@@ -1,87 +1,86 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Incidencias</title>
-    <style>
-        body { font-family: Arial, sans-serif; }
-        .tabs button { padding: 8px 12px; margin-right: 5px; cursor: pointer; }
-        .tab-content { display: none; margin-top: 15px; }
-        .tab-content.active { display: block; }
-        details { margin: 8px 0; }
-        table { border-collapse: collapse; width: 100%; margin-top: 5px; }
-        th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-        a.map-link {
-            white-space: nowrap;
-            text-decoration: none;
-            color: #0066cc;
-            font-weight: 500;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>WO Pendientes FTTH</title>
 
-    <script>
-        function showTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-        }
-    </script>
+<style>
+body { background:#0f172a; color:#e5e7eb; font-family:Arial; padding:20px }
+.filters { display:flex; gap:15px; flex-wrap:wrap; margin-bottom:20px }
+select { padding:6px }
+table { width:100%; border-collapse:collapse; font-size:13px }
+th,td { border:1px solid #334155; padding:6px }
+th { background:#1e293b }
+tr:nth-child(even){ background:#020617 }
+a { color:#38bdf8; text-decoration:none }
+</style>
 </head>
+
 <body>
 
-<div class="tabs">
-    {% for tab in tabs %}
-        <button onclick="showTab('{{ tab|replace(' ', '_') }}')">
-            {{ tab }}
-        </button>
-    {% endfor %}
-</div>
+<h1>WO Pendientes FTTH</h1>
 
-{% for tab in tabs %}
-<div id="{{ tab|replace(' ', '_') }}" class="tab-content {% if loop.first %}active{% endif %}">
+<form method="get" class="filters">
 
-    {% for group_name, group_data in data[tab].items() %}
-        <details>
-            <summary><strong>{{ group_name }}</strong></summary>
-
-            {% for subgroup, rows in group_data.items() %}
-                <details>
-                    <summary>{{ subgroup }}</summary>
-
-                    {% if rows %}
-                    <table>
-                        <tr>
-                            {% for key in rows[0].keys() %}
-                                <th>{{ key }}</th>
-                            {% endfor %}
-                        </tr>
-
-                        {% for row in rows %}
-                        <tr>
-                            {% for key, value in row.items() %}
-                                {% if key == "MAP_LINK" and value %}
-                                    <td>
-                                        <a class="map-link" href="{{ value }}" target="_blank">
-                                            Ver mapa
-                                        </a>
-                                    </td>
-                                {% else %}
-                                    <td>{{ value }}</td>
-                                {% endif %}
-                            {% endfor %}
-                        </tr>
-                        {% endfor %}
-                    </table>
-                    {% else %}
-                        <p>No hay registros</p>
-                    {% endif %}
-
-                </details>
-            {% endfor %}
-        </details>
-    {% endfor %}
-
-</div>
+<select name="tab" onchange="this.form.submit()">
+{% for t in tabs %}
+<option value="{{t}}" {% if t==selected_tab %}selected{% endif %}>{{t}}</option>
 {% endfor %}
+</select>
+
+{% if show_branch %}
+<select name="branch" onchange="this.form.submit()">
+<option value="">BRANCH</option>
+{% for b in branches %}
+<option value="{{b}}" {% if b==selected_branch %}selected{% endif %}>{{b}}</option>
+{% endfor %}
+</select>
+{% endif %}
+
+{% if show_contrata %}
+<select name="contrata" onchange="this.form.submit()">
+<option value="">CONTRATA</option>
+{% for c in contratas %}
+<option value="{{c}}" {% if c==selected_contrata %}selected{% endif %}>{{c}}</option>
+{% endfor %}
+</select>
+{% endif %}
+
+</form>
+
+<p>Resultados: {{ rows|length }}</p>
+
+<table>
+<thead>
+<tr>
+{% for h in headers %}
+{% if h != "Coordenadas" %}
+<th>{{h}}</th>
+{% endif %}
+{% endfor %}
+<th>MAPA</th>
+</tr>
+</thead>
+
+<tbody>
+{% for row in rows %}
+<tr>
+{% for key, value in row.items() %}
+{% if key != "Coordenadas" and key != "MAP_LINK" %}
+<td>{{ value }}</td>
+{% endif %}
+{% endfor %}
+<td>
+{% if row.MAP_LINK %}
+<a href="{{ row.MAP_LINK }}" target="_blank">📍 Ver mapa</a>
+{% else %}
+—
+{% endif %}
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
 
 </body>
 </html>
