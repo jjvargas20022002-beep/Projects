@@ -49,6 +49,7 @@
                 <details>
                     <summary>{{ subgroup }}</summary>
 
+                    {% if rows %}
                     <table>
                         <tr>
                             {% for key in rows[0].keys() %}
@@ -62,7 +63,7 @@
                                 {% if key == "MAP_LINK" and value %}
                                     <td>
                                         <a class="map-link" href="{{ value }}" target="_blank">
-                                            Ver mapa
+                                            📍 Ver mapa
                                         </a>
                                     </td>
                                 {% else %}
@@ -72,6 +73,9 @@
                         </tr>
                         {% endfor %}
                     </table>
+                    {% else %}
+                        <p>No hay registros</p>
+                    {% endif %}
 
                 </details>
             {% endfor %}

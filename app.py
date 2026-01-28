@@ -3,6 +3,7 @@ import pandas as pd
 
 app = Flask(__name__)
 
+# Tabs que SOLO usan SITE
 TABS_SITE_ONLY = {
     "LI1 TGI",
     "LI2 DIJUSA",
@@ -17,6 +18,7 @@ TABS_SITE_ONLY = {
 def index():
     df = pd.read_csv("data.csv")
 
+    # Link Google Maps
     df["MAP_LINK"] = df.apply(
         lambda r: f"https://www.google.com/maps?q={r['LATITUDE']},{r['LONGITUDE']}"
         if pd.notna(r["LATITUDE"]) and pd.notna(r["LONGITUDE"])
