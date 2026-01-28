@@ -58,6 +58,18 @@ def col_index(headers, name_list):
     return None
 
 # =====================
+# CONFIGURACIÓN FILTROS POR TAB
+# =====================
+BRANCH_TABS = [
+    "GARANTIAS LIMA",
+    "GARANTIAS PROVINCIA",
+    "FUERA DE GARANTÍA PROVINCIA",
+    "CANCELADOS",
+    "ONLINE LIMA",
+    "PENDIENTES ODN"
+]
+
+# =====================
 # ROUTES
 # =====================
 @app.route("/")
@@ -68,7 +80,6 @@ def index():
     if not selected_tab or selected_tab not in tabs:
         selected_tab = tabs[0]
 
-    # Data
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
     if not data or len(data) < 2:
@@ -78,33 +89,43 @@ def index():
             selected_tab=selected_tab,
             headers=[],
             rows_with_links=[],
-            branches=[],
-            contratas=[],
-            selected_branch="",
-            selected_contrata="",
+            filters1=[],
+            filters2=[],
+            selected_filter1="",
+            selected_filter2="",
             coord_idx=None,
+            is_branch_tab=False,
         )
 
     headers = data[0]
     rows = data[1:]
 
-    # Column indices
-    branch_idx = col_index(headers, ["BRANCH", "SITE"])
-    contrata_idx = col_index(headers, ["CONTRATA", "REPORTE"])
+    # Determinar qué filtros usar según TAB
+    is_branch_tab = selected_tab in BRANCH_TABS
+    if is_branch_tab:
+        filter1_name_list = ["BRANCH"]
+        filter2_name_list = ["CONTRATA"]
+    else:
+        filter1_name_list = ["SITE"]
+        filter2_name_list = ["Reporte de Contrata"]
+
+    filter1_idx = col_index(headers, filter1_name_list)
+    filter2_idx = col_index(headers, filter2_name_list)
     coord_idx = col_index(headers, ["COORD", "GPS", "UBIC"])
 
-    # Filtros
-    selected_branch = request.args.get("branch", "")
-    selected_contrata = request.args.get("contrata", "")
+    # Reiniciar filtros al cambiar de TAB
+    selected_filter1 = request.args.get("filter1", "")
+    selected_filter2 = request.args.get("filter2", "")
 
-    if selected_branch and branch_idx is not None:
-        rows = [r for r in rows if len(r) > branch_idx and r[branch_idx] == selected_branch]
+    if selected_filter1 and filter1_idx is not None:
+        rows = [r for r in rows if len(r) > filter1_idx and r[filter1_idx] == selected_filter1]
 
-    if selected_contrata and contrata_idx is not None:
-        rows = [r for r in rows if len(r) > contrata_idx and r[contrata_idx] == selected_contrata]
+    if selected_filter2 and filter2_idx is not None:
+        rows = [r for r in rows if len(r) > filter2_idx and r[filter2_idx] == selected_filter2]
 
-    branches = sorted({r[branch_idx] for r in data[1:] if branch_idx is not None and len(r) > branch_idx}) if branch_idx is not None else []
-    contratas = sorted({r[contrata_idx] for r in data[1:] if contrata_idx is not None and len(r) > contrata_idx}) if contrata_idx is not None else []
+    # Obtener opciones únicas para desglosables
+    filters1 = sorted({r[filter1_idx] for r in data[1:] if filter1_idx is not None and len(r) > filter1_idx}) if filter1_idx is not None else []
+    filters2 = sorted({r[filter2_idx] for r in data[1:] if filter2_idx is not None and len(r) > filter2_idx}) if filter2_idx is not None else []
 
     # Agregar links de coordenadas
     rows_with_links = []
@@ -118,11 +139,12 @@ def index():
         selected_tab=selected_tab,
         headers=headers,
         rows_with_links=rows_with_links,
-        branches=branches,
-        contratas=contratas,
-        selected_branch=selected_branch,
-        selected_contrata=selected_contrata,
+        filters1=filters1,
+        filters2=filters2,
+        selected_filter1=selected_filter1,
+        selected_filter2=selected_filter2,
         coord_idx=coord_idx,
+        is_branch_tab=is_branch_tab,
     )
 
 if __name__ == "__main__":
