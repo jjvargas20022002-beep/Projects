@@ -32,13 +32,12 @@ gc = gspread.authorize(creds)
 sheet = gc.open_by_key(SPREADSHEET_ID)
 
 # =====================
-# UTIL: coordenadas → link Google Maps
+# UTIL: Coordenadas → Google Maps
 # =====================
 def coord_to_link(value):
     if not value:
         return None
-    value = str(value).strip()
-    value = re.sub(r"\s+", "", value)
+    value = re.sub(r"\s+", "", str(value))
     if "," not in value:
         return None
     try:
@@ -49,7 +48,8 @@ def coord_to_link(value):
     except:
         return None
 
-# TABs que usan Branch/Contrata
+
+# Tabs con filtros BRANCH / CONTRATA
 BRANCH_TABS = [
     "GARANTIAS LIMA",
     "GARANTIAS PROVINCIA",
@@ -59,41 +59,27 @@ BRANCH_TABS = [
     "PENDIENTES ODN",
 ]
 
+
 @app.route("/")
 def index():
-    # Todos los tabs del sheet
     tabs = [ws.title for ws in sheet.worksheets()]
 
-    # TAB seleccionado
     selected_tab = request.args.get("tab")
     if not selected_tab or selected_tab not in tabs:
         selected_tab = tabs[0]
 
-    # Detectar cambio de TAB
     prev_tab = request.args.get("prev_tab", "")
     tab_changed = prev_tab != selected_tab
 
-    # Worksheet
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
-    if not data or len(data) < 2:
-        return render_template(
-            "index.html",
-            tabs=tabs,
-            selected_tab=selected_tab,
-            headers=[],
-            rows_with_links=[],
-            filters1=[],
-            filters2=[],
-            selected_filter1="",
-            selected_filter2="",
-            is_branch_tab=selected_tab in BRANCH_TABS,
-        )
+
+    if len(data) < 2:
+        return render_template("index.html", tabs=tabs, selected_tab=selected_tab)
 
     headers = data[0]
     rows = data[1:]
 
-    # Indices de columnas importantes
     def col_index(name):
         return headers.index(name) if name in headers else None
 
@@ -101,16 +87,15 @@ def index():
     contrata_idx = col_index("CONTRATA")
     site_idx = col_index("SITE")
     reporte_idx = col_index("Reporte de Contrata")
+
     coord_idx = None
     for i, h in enumerate(headers):
         if any(k in h.upper() for k in ["COORD", "GPS", "UBIC"]):
             coord_idx = i
             break
 
-    # Filtros
     is_branch_tab = selected_tab in BRANCH_TABS
 
-    # Obtener filtros seleccionados
     if tab_changed:
         selected_filter1 = ""
         selected_filter2 = ""
@@ -118,7 +103,6 @@ def index():
         selected_filter1 = request.args.get("filter1", "")
         selected_filter2 = request.args.get("filter2", "")
 
-    # Aplicar filtros
     if is_branch_tab:
         if selected_filter1 and branch_idx is not None:
             rows = [r for r in rows if len(r) > branch_idx and r[branch_idx] == selected_filter1]
@@ -136,17 +120,23 @@ def index():
         filters1 = sorted({r[site_idx] for r in data[1:] if site_idx is not None and len(r) > site_idx})
         filters2 = sorted({r[reporte_idx] for r in data[1:] if reporte_idx is not None and len(r) > reporte_idx})
 
-    # Crear links de coordenadas
+    # Ocultar columna de coordenadas
+    visible_headers = headers.copy()
+    if coord_idx is not None:
+        visible_headers.pop(coord_idx)
+
     rows_with_links = []
     for r in rows:
         link = coord_to_link(r[coord_idx]) if coord_idx is not None and len(r) > coord_idx else None
+        if coord_idx is not None:
+            r = r[:coord_idx] + r[coord_idx + 1 :]
         rows_with_links.append((r, link))
 
     return render_template(
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        headers=headers,
+        headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
         filters2=filters2,

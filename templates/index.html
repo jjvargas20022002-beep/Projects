@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>WO Pendientes FTTH</title>
+
 <style>
 body { background:#0f172a; color:#e5e7eb; font-family:Arial; padding:20px }
 h1 { margin-bottom:15px }
@@ -13,48 +14,55 @@ th, td { border:1px solid #334155; padding:6px }
 th { background:#1e293b }
 tr:nth-child(even){ background:#020617 }
 a { color:#38bdf8; text-decoration:none }
+
+.map-cell a {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 </style>
 </head>
+
 <body>
 
 <h1>WO Pendientes FTTH</h1>
 
 <form method="get" class="filters">
-  <!-- Guardar TAB anterior -->
   <input type="hidden" name="prev_tab" value="{{ selected_tab }}">
 
-  <!-- SELECTOR DE TAB -->
   <select name="tab" onchange="this.form.submit()">
     {% for t in tabs %}
-    <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>{{ t }}</option>
+      <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>{{ t }}</option>
     {% endfor %}
   </select>
 
-  <!-- FILTROS -->
   {% if is_branch_tab %}
     <select name="filter1" onchange="this.form.submit()">
       <option value="">BRANCH</option>
       {% for f in filters1 %}
-      <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
+        <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
       {% endfor %}
     </select>
+
     <select name="filter2" onchange="this.form.submit()">
       <option value="">CONTRATA</option>
       {% for f in filters2 %}
-      <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
+        <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
       {% endfor %}
     </select>
   {% else %}
     <select name="filter1" onchange="this.form.submit()">
       <option value="">SITE</option>
       {% for f in filters1 %}
-      <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
+        <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
       {% endfor %}
     </select>
+
     <select name="filter2" onchange="this.form.submit()">
       <option value="">REPORTE CONTRATA</option>
       {% for f in filters2 %}
-      <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
+        <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
       {% endfor %}
     </select>
   {% endif %}
@@ -66,7 +74,7 @@ a { color:#38bdf8; text-decoration:none }
 <thead>
 <tr>
   {% for h in headers %}
-  <th>{{ h }}</th>
+    <th>{{ h }}</th>
   {% endfor %}
   <th>MAPA</th>
 </tr>
@@ -75,10 +83,10 @@ a { color:#38bdf8; text-decoration:none }
 <tbody>
 {% for row, link in rows_with_links %}
 <tr>
-  {% for h in headers %}
-  <td>{{ row[headers.index(h)] }}</td>
+  {% for cell in row %}
+    <td>{{ cell }}</td>
   {% endfor %}
-  <td>
+  <td class="map-cell">
     {% if link %}
       <a href="{{ link }}" target="_blank">📍 Ver mapa</a>
     {% else %}
