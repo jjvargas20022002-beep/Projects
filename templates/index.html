@@ -20,45 +20,44 @@ a { color:#38bdf8; text-decoration:none }
 <h1>WO Pendientes FTTH</h1>
 
 <form method="get" class="filters">
+  <!-- Guardar TAB anterior -->
+  <input type="hidden" name="prev_tab" value="{{ selected_tab }}">
 
-<!-- TAB -->
-<select name="tab" onchange="this.form.submit()">
-  {% for t in tabs %}
-  <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>{{ t }}</option>
-  {% endfor %}
-</select>
+  <!-- SELECTOR DE TAB -->
+  <select name="tab" onchange="this.form.submit()">
+    {% for t in tabs %}
+    <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>{{ t }}</option>
+    {% endfor %}
+  </select>
 
-<!-- FILTROS SEGÚN TAB -->
-{% if is_branch_tab %}
-<select name="filter1" onchange="this.form.submit()">
-  <option value="">BRANCH</option>
-  {% for f in filters1 %}
-  <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
-  {% endfor %}
-</select>
-
-<select name="filter2" onchange="this.form.submit()">
-  <option value="">CONTRATA</option>
-  {% for f in filters2 %}
-  <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
-  {% endfor %}
-</select>
-{% else %}
-<select name="filter1" onchange="this.form.submit()">
-  <option value="">SITE</option>
-  {% for f in filters1 %}
-  <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
-  {% endfor %}
-</select>
-
-<select name="filter2" onchange="this.form.submit()">
-  <option value="">REPORTE CONTRATA</option>
-  {% for f in filters2 %}
-  <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
-  {% endfor %}
-</select>
-{% endif %}
-
+  <!-- FILTROS -->
+  {% if is_branch_tab %}
+    <select name="filter1" onchange="this.form.submit()">
+      <option value="">BRANCH</option>
+      {% for f in filters1 %}
+      <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
+      {% endfor %}
+    </select>
+    <select name="filter2" onchange="this.form.submit()">
+      <option value="">CONTRATA</option>
+      {% for f in filters2 %}
+      <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
+      {% endfor %}
+    </select>
+  {% else %}
+    <select name="filter1" onchange="this.form.submit()">
+      <option value="">SITE</option>
+      {% for f in filters1 %}
+      <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
+      {% endfor %}
+    </select>
+    <select name="filter2" onchange="this.form.submit()">
+      <option value="">REPORTE CONTRATA</option>
+      {% for f in filters2 %}
+      <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
+      {% endfor %}
+    </select>
+  {% endif %}
 </form>
 
 <p>Resultados: {{ rows_with_links|length }}</p>
@@ -72,11 +71,12 @@ a { color:#38bdf8; text-decoration:none }
   <th>MAPA</th>
 </tr>
 </thead>
+
 <tbody>
 {% for row, link in rows_with_links %}
 <tr>
-  {% for i in range(headers|length) %}
-  <td>{{ row[i] if i < row|length else '' }}</td>
+  {% for h in headers %}
+  <td>{{ row[headers.index(h)] }}</td>
   {% endfor %}
   <td>
     {% if link %}

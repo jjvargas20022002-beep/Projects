@@ -32,7 +32,7 @@ gc = gspread.authorize(creds)
 sheet = gc.open_by_key(SPREADSHEET_ID)
 
 # =====================
-# UTILS
+# UTIL: coordenadas → link Google Maps
 # =====================
 def coord_to_link(value):
     if not value:
@@ -49,37 +49,31 @@ def coord_to_link(value):
     except:
         return None
 
-def col_index(headers, name_list):
-    """Busca el índice de la primera columna que coincida con algún nombre"""
-    for i, h in enumerate(headers):
-        for name in name_list:
-            if name.upper() in h.upper():
-                return i
-    return None
-
-# =====================
-# CONFIGURACIÓN FILTROS POR TAB
-# =====================
+# TABs que usan Branch/Contrata
 BRANCH_TABS = [
     "GARANTIAS LIMA",
     "GARANTIAS PROVINCIA",
     "FUERA DE GARANTÍA PROVINCIA",
     "CANCELADOS",
     "ONLINE LIMA",
-    "PENDIENTES ODN"
+    "PENDIENTES ODN",
 ]
 
-# =====================
-# ROUTES
-# =====================
 @app.route("/")
 def index():
-    # Tabs
+    # Todos los tabs del sheet
     tabs = [ws.title for ws in sheet.worksheets()]
+
+    # TAB seleccionado
     selected_tab = request.args.get("tab")
     if not selected_tab or selected_tab not in tabs:
         selected_tab = tabs[0]
 
+    # Detectar cambio de TAB
+    prev_tab = request.args.get("prev_tab", "")
+    tab_changed = prev_tab != selected_tab
+
+    # Worksheet
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
     if not data or len(data) < 2:
@@ -93,41 +87,56 @@ def index():
             filters2=[],
             selected_filter1="",
             selected_filter2="",
-            coord_idx=None,
-            is_branch_tab=False,
+            is_branch_tab=selected_tab in BRANCH_TABS,
         )
 
     headers = data[0]
     rows = data[1:]
 
-    # Determinar qué filtros usar según TAB
+    # Indices de columnas importantes
+    def col_index(name):
+        return headers.index(name) if name in headers else None
+
+    branch_idx = col_index("BRANCH")
+    contrata_idx = col_index("CONTRATA")
+    site_idx = col_index("SITE")
+    reporte_idx = col_index("Reporte de Contrata")
+    coord_idx = None
+    for i, h in enumerate(headers):
+        if any(k in h.upper() for k in ["COORD", "GPS", "UBIC"]):
+            coord_idx = i
+            break
+
+    # Filtros
     is_branch_tab = selected_tab in BRANCH_TABS
-    if is_branch_tab:
-        filter1_name_list = ["BRANCH"]
-        filter2_name_list = ["CONTRATA"]
+
+    # Obtener filtros seleccionados
+    if tab_changed:
+        selected_filter1 = ""
+        selected_filter2 = ""
     else:
-        filter1_name_list = ["SITE"]
-        filter2_name_list = ["Reporte de Contrata"]
+        selected_filter1 = request.args.get("filter1", "")
+        selected_filter2 = request.args.get("filter2", "")
 
-    filter1_idx = col_index(headers, filter1_name_list)
-    filter2_idx = col_index(headers, filter2_name_list)
-    coord_idx = col_index(headers, ["COORD", "GPS", "UBIC"])
+    # Aplicar filtros
+    if is_branch_tab:
+        if selected_filter1 and branch_idx is not None:
+            rows = [r for r in rows if len(r) > branch_idx and r[branch_idx] == selected_filter1]
+        if selected_filter2 and contrata_idx is not None:
+            rows = [r for r in rows if len(r) > contrata_idx and r[contrata_idx] == selected_filter2]
 
-    # Reiniciar filtros al cambiar de TAB
-    selected_filter1 = request.args.get("filter1", "")
-    selected_filter2 = request.args.get("filter2", "")
+        filters1 = sorted({r[branch_idx] for r in data[1:] if branch_idx is not None and len(r) > branch_idx})
+        filters2 = sorted({r[contrata_idx] for r in data[1:] if contrata_idx is not None and len(r) > contrata_idx})
+    else:
+        if selected_filter1 and site_idx is not None:
+            rows = [r for r in rows if len(r) > site_idx and r[site_idx] == selected_filter1]
+        if selected_filter2 and reporte_idx is not None:
+            rows = [r for r in rows if len(r) > reporte_idx and r[reporte_idx] == selected_filter2]
 
-    if selected_filter1 and filter1_idx is not None:
-        rows = [r for r in rows if len(r) > filter1_idx and r[filter1_idx] == selected_filter1]
+        filters1 = sorted({r[site_idx] for r in data[1:] if site_idx is not None and len(r) > site_idx})
+        filters2 = sorted({r[reporte_idx] for r in data[1:] if reporte_idx is not None and len(r) > reporte_idx})
 
-    if selected_filter2 and filter2_idx is not None:
-        rows = [r for r in rows if len(r) > filter2_idx and r[filter2_idx] == selected_filter2]
-
-    # Obtener opciones únicas para desglosables
-    filters1 = sorted({r[filter1_idx] for r in data[1:] if filter1_idx is not None and len(r) > filter1_idx}) if filter1_idx is not None else []
-    filters2 = sorted({r[filter2_idx] for r in data[1:] if filter2_idx is not None and len(r) > filter2_idx}) if filter2_idx is not None else []
-
-    # Agregar links de coordenadas
+    # Crear links de coordenadas
     rows_with_links = []
     for r in rows:
         link = coord_to_link(r[coord_idx]) if coord_idx is not None and len(r) > coord_idx else None
@@ -143,9 +152,9 @@ def index():
         filters2=filters2,
         selected_filter1=selected_filter1,
         selected_filter2=selected_filter2,
-        coord_idx=coord_idx,
         is_branch_tab=is_branch_tab,
     )
+
 
 if __name__ == "__main__":
     app.run(debug=True)
