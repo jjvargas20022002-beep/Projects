@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>WO Pendientes FTTH</title>
 
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -29,38 +28,38 @@ tr:nth-child(even){ background:#020617 }
 <input type="hidden" name="prev_tab" value="{{ selected_tab }}">
 
 <select name="tab" onchange="this.form.submit()">
-  {% for t in tabs %}
-  <option value="{{ t }}" {% if t==selected_tab %}selected{% endif %}>{{ t }}</option>
-  {% endfor %}
+{% for t in tabs %}
+<option value="{{ t }}" {% if t==selected_tab %}selected{% endif %}>{{ t }}</option>
+{% endfor %}
 </select>
 
 {% if is_branch_tab %}
 <select name="filter1" onchange="this.form.submit()">
-  <option value="">BRANCH</option>
-  {% for f in filters1 %}
-  <option value="{{ f }}" {% if f==selected_filter1 %}selected{% endif %}>{{ f }}</option>
-  {% endfor %}
+<option value="">BRANCH</option>
+{% for f in filters1 %}
+<option value="{{ f }}" {% if f==selected_filter1 %}selected{% endif %}>{{ f }}</option>
+{% endfor %}
 </select>
 
 <select name="filter2" onchange="this.form.submit()">
-  <option value="">CONTRATA</option>
-  {% for f in filters2 %}
-  <option value="{{ f }}" {% if f==selected_filter2 %}selected{% endif %}>{{ f }}</option>
-  {% endfor %}
+<option value="">CONTRATA</option>
+{% for f in filters2 %}
+<option value="{{ f }}" {% if f==selected_filter2 %}selected{% endif %}>{{ f }}</option>
+{% endfor %}
 </select>
 {% else %}
 <select name="filter1" onchange="this.form.submit()">
-  <option value="">SITE</option>
-  {% for f in filters1 %}
-  <option value="{{ f }}" {% if f==selected_filter1 %}selected{% endif %}>{{ f }}</option>
-  {% endfor %}
+<option value="">SITE</option>
+{% for f in filters1 %}
+<option value="{{ f }}" {% if f==selected_filter1 %}selected{% endif %}>{{ f }}</option>
+{% endfor %}
 </select>
 
 <select name="filter2" onchange="this.form.submit()">
-  <option value="">REPORTE CONTRATA</option>
-  {% for f in filters2 %}
-  <option value="{{ f }}" {% if f==selected_filter2 %}selected{% endif %}>{{ f }}</option>
-  {% endfor %}
+<option value="">REPORTE CONTRATA</option>
+{% for f in filters2 %}
+<option value="{{ f }}" {% if f==selected_filter2 %}selected{% endif %}>{{ f }}</option>
+{% endfor %}
 </select>
 {% endif %}
 
@@ -70,21 +69,26 @@ tr:nth-child(even){ background:#020617 }
 </form>
 
 <div id="map-container" style="display:none">
-  <div id="map"></div>
+<div id="map"></div>
 </div>
-
-<p>Resultados: {{ rows|length }}</p>
 
 <table>
 <thead>
 <tr>
 {% for h in headers %}<th>{{ h }}</th>{% endfor %}
+<th>MAPA</th>
 </tr>
 </thead>
+
 <tbody>
-{% for r in rows %}
+{% for row, link in rows_with_links %}
 <tr>
-{% for c in r %}<td>{{ c }}</td>{% endfor %}
+{% for c in row %}<td>{{ c }}</td>{% endfor %}
+<td class="map-cell">
+{% if link %}
+<a href="{{ link }}" target="_blank">📍 Ver mapa</a>
+{% else %}—{% endif %}
+</td>
 </tr>
 {% endfor %}
 </tbody>
@@ -94,24 +98,23 @@ tr:nth-child(even){ background:#020617 }
 let map;
 
 function toggleMap() {
-  const cont = document.getElementById("map-container");
-  cont.style.display = cont.style.display === "none" ? "block" : "none";
-  if (cont.style.display === "block") initMap();
+  const c = document.getElementById("map-container");
+  c.style.display = c.style.display === "none" ? "block" : "none";
+  if (c.style.display === "block") initMap();
 }
 
 function initMap() {
   if (map) map.remove();
   map = L.map("map");
-
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-  const coords = {{ coords | tojson }};
-  if (!coords.length) { map.setView([0,0],2); return; }
+  const points = {{ all_coords | tojson }};
+  if (!points.length) return map.setView([0,0],2);
 
   const bounds = [];
-  coords.forEach(c=>{
-    L.marker([c.lat,c.lng]).addTo(map);
-    bounds.push([c.lat,c.lng]);
+  points.forEach(p=>{
+    L.marker([p.lat,p.lng]).addTo(map);
+    bounds.push([p.lat,p.lng]);
   });
   map.fitBounds(bounds);
 }
