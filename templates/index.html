@@ -69,9 +69,7 @@ a { color:#38bdf8; text-decoration:none }
 <td>
 {% if row.MAP_LINK %}
 <a href="{{ row.MAP_LINK }}" target="_blank">📍 Ver mapa</a>
-{% else %}
-—
-{% endif %}
+{% else %}—{% endif %}
 </td>
 </tr>
 {% endfor %}
