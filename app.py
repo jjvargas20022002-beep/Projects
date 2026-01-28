@@ -82,6 +82,15 @@ def find_col(headers, expected_name):
 def index():
     tabs = [ws.title for ws in sheet.worksheets()]
     selected_tab = request.args.get("tab", tabs[0])
+    last_tab = request.args.get("last_tab", "")
+
+    # 🔴 RESET DE FILTROS SI CAMBIA EL TAB
+    if last_tab != selected_tab:
+        selected_filter1 = ""
+        selected_filter2 = ""
+    else:
+        selected_filter1 = request.args.get("filter1", "")
+        selected_filter2 = request.args.get("filter2", "")
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
@@ -127,9 +136,6 @@ def index():
         if col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip()
     })
 
-    selected_filter1 = request.args.get("filter1", "")
-    selected_filter2 = request.args.get("filter2", "")
-
     # =====================
     # FILTRADO (TABLA)
     # =====================
@@ -148,7 +154,7 @@ def index():
     filtered_count = len(filtered_rows)
 
     # =====================
-    # MAPA (SIN FILTROS)
+    # MAPA (SIEMPRE TODAS LAS COORDENADAS)
     # =====================
     all_coords = []
     if coord_idx is not None:
@@ -195,6 +201,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
+        last_tab=selected_tab,  # 👈 CLAVE PARA RESET
         headers=visible_headers,
         rows_with_links=rows_with_links,
         has_coords=coord_idx is not None,
