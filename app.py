@@ -18,7 +18,7 @@ SHEETS = {
     "ONLINE LIMA": "912345678"
 }
 
-FILTER_TABS = [
+EXTRA_FILTER_TABS = [
     "LI1 TGI",
     "LI2 DIJUSA",
     "LI2 ERAM",
@@ -26,64 +26,75 @@ FILTER_TABS = [
     "LI4 TGI",
     "LI4 SMP",
     "LI7 MARCOS",
-    "LI4 BROKERS"
+    "LI4 BROKERS",
 ]
 
 @app.route("/")
 def index():
-    selected_tab = request.args.get("tab", list(SHEETS.keys())[0])
-    site_filter = request.args.get("site", "")
-    reporte_filter = request.args.get("reporte", "")
+    # 🔒 TAB seguro
+    selected_tab = request.args.get("tab")
+    if not selected_tab or selected_tab not in SHEETS:
+        selected_tab = list(SHEETS.keys())[0]
 
-    gid = SHEETS.get(selected_tab)
-    csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid={gid}"
+    gid = SHEETS[selected_tab]
 
-    df = pd.read_csv(csv_url)
+    url = (
+        f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
+        f"/export?format=csv&gid={gid}"
+    )
 
-    # Limpiar encabezados
+    df = pd.read_csv(url)
     df.columns = df.columns.str.strip()
 
-    # Detectar columnas reales
-    has_coords = "Coordenadas" in df.columns
-    has_site = "SITE" in df.columns
-    has_reporte = "Reporte de Contrata" in df.columns
-
-    # Filtros SOLO si existen
-    if selected_tab in FILTER_TABS:
-        if has_site and site_filter:
-            df = df[df["SITE"] == site_filter]
-        if has_reporte and reporte_filter:
-            df = df[df["Reporte de Contrata"] == reporte_filter]
-
-    # Opciones de filtros
-    sites = sorted(df["SITE"].dropna().unique()) if has_site else []
-    reportes = sorted(df["Reporte de Contrata"].dropna().unique()) if has_reporte else []
-
-    # MAPA
-    if has_coords:
-        def build_map(coord):
-            if isinstance(coord, str) and "," in coord:
-                lat, lon = coord.split(",")
-                return f"https://www.google.com/maps?q={lat.strip()},{lon.strip()}"
-            return None
-
-        df["MAP_LINK"] = df["Coordenadas"].apply(build_map)
+    # 📍 Google Maps desde "Coordenadas"
+    if "Coordenadas" in df.columns:
+        df["MAP_LINK"] = df["Coordenadas"].apply(
+            lambda x: f"https://www.google.com/maps?q={x}"
+            if pd.notna(x) and "," in str(x)
+            else ""
+        )
+        df = df.drop(columns=["Coordenadas"])
     else:
-        df["MAP_LINK"] = None
+        df["MAP_LINK"] = ""
 
-    headers = [c for c in df.columns if c != "Coordenadas" and c != "MAP_LINK"]
+    show_extra_filters = selected_tab in EXTRA_FILTER_TABS
+
+    selected_site = request.args.get("site", "")
+    selected_reporte = request.args.get("reporte", "")
+
+    # 🔽 Filtros dinámicos
+    if show_extra_filters:
+        if "SITE" in df.columns:
+            sites = sorted(df["SITE"].dropna().unique())
+            if selected_site:
+                df = df[df["SITE"] == selected_site]
+        else:
+            sites = []
+
+        if "Reporte de Contrata" in df.columns:
+            reportes = sorted(df["Reporte de Contrata"].dropna().unique())
+            if selected_reporte:
+                df = df[df["Reporte de Contrata"] == selected_reporte]
+        else:
+            reportes = []
+    else:
+        sites = []
+        reportes = []
+
+    headers = list(df.columns)
+    rows = df.to_dict("records")
 
     return render_template(
         "index.html",
-        tabs=SHEETS.keys(),
+        tabs=list(SHEETS.keys()),
         selected_tab=selected_tab,
         headers=headers,
-        rows=df.to_dict(orient="records"),
-        show_extra_filters=selected_tab in FILTER_TABS,
+        rows=rows,
+        show_extra_filters=show_extra_filters,
         sites=sites,
         reportes=reportes,
-        selected_site=site_filter,
-        selected_reporte=reporte_filter
+        selected_site=selected_site,
+        selected_reporte=selected_reporte,
     )
 
 if __name__ == "__main__":
