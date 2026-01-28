@@ -10,7 +10,7 @@ TABS_SITE_ONLY = {
     "LI2 ERAM",
     "LI3 INTER",
     "LI4 TGI",
-    "LI4 BROKERS",
+    "LI4 BROKERS",   # ← ÚNICO CAMBIO AQUÍ
     "LI7 MARCOS"
 }
 
@@ -18,7 +18,6 @@ TABS_SITE_ONLY = {
 def index():
     df = pd.read_csv("data.csv")
 
-    # Link Google Maps
     df["MAP_LINK"] = df.apply(
         lambda r: f"https://www.google.com/maps?q={r['LATITUDE']},{r['LONGITUDE']}"
         if pd.notna(r["LATITUDE"]) and pd.notna(r["LONGITUDE"])
