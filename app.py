@@ -133,8 +133,8 @@ def index():
     # Siempre ocultar columnas LINK
     hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
 
-    # ONLINE LIMA: no mostrar MAPA
-    show_map_column = coord_idx is not None and selected_tab != "ONLINE LIMA"
+    # Mostrar columna MAPA si hay coordenadas
+    show_map_column = coord_idx is not None
 
     # headers visibles
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
@@ -143,7 +143,9 @@ def index():
     rows_with_links = []
     for r in filtered_rows:
         visible_row = [c for i, c in enumerate(r) if i not in hidden_idxs]
-        link = coord_to_link(r[coord_idx]) if coord_idx is not None else None
+        link = None
+        if coord_idx is not None and len(r) > coord_idx and r[coord_idx].strip():
+            link = coord_to_link(r[coord_idx])
         rows_with_links.append((visible_row, link))
 
     return render_template(
