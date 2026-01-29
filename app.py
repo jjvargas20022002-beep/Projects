@@ -84,7 +84,6 @@ def index():
 
     headers = data[0]
     rows_all = data[1:]
-
     total_rows = len(rows_all)
 
     # =====================
@@ -159,7 +158,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab=selected_tab,   # 👈 importante para filtrar correctamente
+        last_tab=selected_tab,   # 👈 clave para que los filtros funcionen
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
