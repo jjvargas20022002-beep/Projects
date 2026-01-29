@@ -70,12 +70,12 @@ def index():
 
     # ====== obtener valores del formulario ======
     selected_tab = request.args.get("tab", tabs[0])
-    last_tab = request.args.get("last_tab", "")  # tab anterior
+    last_tab = request.args.get("last_tab", "")  # tab anterior real
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
     # ====== si cambió el tab, resetear filtros ======
-    if selected_tab != last_tab:
+    if last_tab != "" and selected_tab != last_tab:
         selected_filter1 = ""
         selected_filter2 = ""
 
@@ -146,7 +146,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab=selected_tab,  # clave para resetear filtros al cambiar tab
+        last_tab=selected_tab,  # enviamos siempre el tab actual al frontend
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,

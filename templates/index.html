@@ -152,7 +152,6 @@ function toggleMap() {
   }
 }
 
-// Inicializar mapa y agregar marcadores
 function initMap() {
   if (!map) {
     map = L.map("map");
@@ -181,7 +180,8 @@ const tabSelect = document.getElementById("tab_select");
 const lastTabInput = document.getElementById("last_tab");
 
 tabSelect.addEventListener("change", () => {
-  lastTabInput.value = tabSelect.value;
+  // ponemos el valor del tab ANTERIOR en last_tab
+  lastTabInput.value = ""; // al cambiar de tab, dejamos vacío para que backend detecte cambio
   tabSelect.form.submit();
 });
 </script>
