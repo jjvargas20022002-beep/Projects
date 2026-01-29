@@ -58,7 +58,11 @@ tr:nth-child(even){ background:#020617 }
 </p>
 
 <form method="get" class="filters">
-  <select name="tab" onchange="this.form.submit()">
+  <!-- input hidden para enviar last_tab -->
+  <input type="hidden" name="last_tab" id="last_tab" value="{{ selected_tab }}">
+
+  <!-- SELECT TAB -->
+  <select name="tab" id="tab_select">
     {% for t in tabs %}
       <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>
         {{ t }}
@@ -148,6 +152,7 @@ function toggleMap() {
   }
 }
 
+// Inicializar mapa y agregar marcadores
 function initMap() {
   if (!map) {
     map = L.map("map");
@@ -168,6 +173,17 @@ function initMap() {
 
   map.fitBounds(bounds);
 }
+
+// =====================
+// ACTUALIZAR last_tab al cambiar de tab
+// =====================
+const tabSelect = document.getElementById("tab_select");
+const lastTabInput = document.getElementById("last_tab");
+
+tabSelect.addEventListener("change", () => {
+  lastTabInput.value = tabSelect.value;
+  tabSelect.form.submit();
+});
 </script>
 
 </body>

@@ -68,16 +68,16 @@ def find_col(headers, expected_name):
 def index():
     tabs = [ws.title for ws in sheet.worksheets()]
 
+    # selecciona tab y filtros desde los args
     selected_tab = request.args.get("tab", tabs[0])
-    last_tab = request.args.get("last_tab", "")
+    last_tab = request.args.get("last_tab", selected_tab)
+    selected_filter1 = request.args.get("filter1", "")
+    selected_filter2 = request.args.get("filter2", "")
 
-    # 🔴 RESET DE FILTROS SI CAMBIA EL TAB
+    # si cambió de tab, resetear filtros
     if selected_tab != last_tab:
         selected_filter1 = ""
         selected_filter2 = ""
-    else:
-        selected_filter1 = request.args.get("filter1", "")
-        selected_filter2 = request.args.get("filter2", "")
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
@@ -158,7 +158,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab=selected_tab,   # 👈 clave para que los filtros funcionen
+        last_tab=selected_tab,   # 👈 importante
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
