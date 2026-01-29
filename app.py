@@ -75,8 +75,14 @@ def index():
     tabs = [ws.title for ws in sheet.worksheets()]
 
     selected_tab = request.args.get("tab", tabs[0])
+    last_tab = request.args.get("last_tab", "")
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
+
+    # 🔴 CLAVE: resetear filtros al cambiar TAB
+    if last_tab != selected_tab:
+        selected_filter1 = ""
+        selected_filter2 = ""
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
@@ -104,7 +110,7 @@ def index():
         if not selected_filter1 or r[col1_idx] == selected_filter1
     ]
 
-    # opciones filtro 2 dependen del filtro 1
+    # opciones filtro 2 (dependen del filtro 1)
     filters2 = sorted({
         r[col2_idx] for r in rows_after_f1
         if col2_idx is not None and len(r) > col2_idx and r[col2_idx]
@@ -116,7 +122,7 @@ def index():
         if not selected_filter2 or r[col2_idx] == selected_filter2
     ]
 
-    # opciones filtro 1 dependen del filtro 2
+    # opciones filtro 1 (dependen del filtro 2)
     filters1 = sorted({
         r[col1_idx] for r in filtered_rows
         if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
@@ -142,12 +148,15 @@ def index():
     # ===== ocultar columnas =====
     hidden_idxs = set()
 
+    # ocultar coordenadas SIEMPRE
     if coord_idx is not None:
-        hidden_idxs.add(coord_idx)  # 👈 OCULTAR COORDENADAS
+        hidden_idxs.add(coord_idx)
 
+    # ocultar caja solo en pendientes ODN
     if selected_tab == "PENDIENTES ODN" and caja_idx is not None:
         hidden_idxs.add(caja_idx)
 
+    # ocultar columnas tipo LINK
     hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
 
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
@@ -162,6 +171,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
+        last_tab=selected_tab,   # 👈 CLAVE
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
