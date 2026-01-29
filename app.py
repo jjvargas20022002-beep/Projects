@@ -70,7 +70,7 @@ def index():
 
     # ====== obtener valores del formulario ======
     selected_tab = request.args.get("tab", tabs[0])
-    last_tab = request.args.get("last_tab", "")  # tab anterior real
+    last_tab = request.args.get("last_tab", "")
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
@@ -146,7 +146,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab=selected_tab,  # enviamos siempre el tab actual al frontend
+        last_tab=selected_tab,  # enviamos el tab actual al frontend
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
