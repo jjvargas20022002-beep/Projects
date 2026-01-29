@@ -61,7 +61,6 @@ def find_col(headers, expected_name):
             return i
     return None
 
-# 🔴 IMPORTANTE: columna exacta
 def find_col_exact(headers, expected_name):
     for i, h in enumerate(headers):
         if h.strip().upper() == expected_name.upper():
@@ -76,13 +75,8 @@ def index():
     tabs = [ws.title for ws in sheet.worksheets()]
 
     selected_tab = request.args.get("tab", tabs[0])
-    last_tab = request.args.get("last_tab", "")
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
-
-    if last_tab != selected_tab:
-        selected_filter1 = ""
-        selected_filter2 = ""
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
@@ -90,12 +84,12 @@ def index():
     rows_all = data[1:]
     total_rows = len(rows_all)
 
-    # ===== columnas clave =====
+    # ===== columnas =====
     coord_idx = find_col(headers, "COORDENADAS")
-    caja_idx = find_col_exact(headers, "CAJA")      # 👈 FIX
+    caja_idx = find_col_exact(headers, "CAJA")
     cuenta_idx = find_col(headers, "CUENTA")
 
-    # ===== filtros =====
+    # ===== filtros según tab =====
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
     else:
@@ -104,39 +98,53 @@ def index():
     col1_idx = find_col(headers, col1_name)
     col2_idx = find_col(headers, col2_name)
 
-    filters1 = sorted({r[col1_idx] for r in rows_all if col1_idx is not None and len(r) > col1_idx and r[col1_idx]})
-    filters2 = sorted({r[col2_idx] for r in rows_all if col2_idx is not None and len(r) > col2_idx and r[col2_idx]})
+    # ===== FILTRO 1 =====
+    rows_after_f1 = [
+        r for r in rows_all
+        if not selected_filter1 or r[col1_idx] == selected_filter1
+    ]
 
-    # ===== aplicar filtros =====
-    filtered_rows = []
-    for r in rows_all:
-        if selected_filter1 and r[col1_idx] != selected_filter1:
-            continue
-        if selected_filter2 and r[col2_idx] != selected_filter2:
-            continue
-        filtered_rows.append(r)
+    # opciones filtro 2 dependen del filtro 1
+    filters2 = sorted({
+        r[col2_idx] for r in rows_after_f1
+        if col2_idx is not None and len(r) > col2_idx and r[col2_idx]
+    })
+
+    # ===== FILTRO 2 =====
+    filtered_rows = [
+        r for r in rows_after_f1
+        if not selected_filter2 or r[col2_idx] == selected_filter2
+    ]
+
+    # opciones filtro 1 dependen del filtro 2
+    filters1 = sorted({
+        r[col1_idx] for r in filtered_rows
+        if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
+    })
 
     filtered_count = len(filtered_rows)
 
-    # ===== coordenadas SOLO FILTRADAS =====
+    # ===== coordenadas (solo filtradas) =====
     coords_info = []
     if coord_idx is not None:
         for r in filtered_rows:
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
-                caja = r[caja_idx] if caja_idx is not None and len(r) > caja_idx else ""
-                cuenta = r[cuenta_idx] if cuenta_idx is not None and len(r) > cuenta_idx else ""
                 coords_info.append({
                     "lat": lat,
                     "lng": lng,
-                    "caja": caja,
-                    "cuenta": cuenta
+                    "caja": r[caja_idx] if caja_idx is not None else "",
+                    "cuenta": r[cuenta_idx] if cuenta_idx is not None else ""
                 })
             except:
                 pass
 
     # ===== ocultar columnas =====
     hidden_idxs = set()
+
+    if coord_idx is not None:
+        hidden_idxs.add(coord_idx)  # 👈 OCULTAR COORDENADAS
+
     if selected_tab == "PENDIENTES ODN" and caja_idx is not None:
         hidden_idxs.add(caja_idx)
 
@@ -147,16 +155,13 @@ def index():
     rows_with_links = []
     for r in filtered_rows:
         visible_row = [c for i, c in enumerate(r) if i not in hidden_idxs]
-        link = None
-        if coord_idx is not None and len(r) > coord_idx and r[coord_idx].strip():
-            link = coord_to_link(r[coord_idx])
+        link = coord_to_link(r[coord_idx]) if coord_idx is not None else None
         rows_with_links.append((visible_row, link))
 
     return render_template(
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab="",
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
