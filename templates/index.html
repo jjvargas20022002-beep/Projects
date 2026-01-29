@@ -33,6 +33,7 @@ tr:nth-child(even){ background:#020617 }
 
 <form method="get" class="filters">
   <input type="hidden" name="last_tab" id="last_tab" value="{{ selected_tab }}">
+
   <select name="tab" id="tab_select">
     {% for t in tabs %}
       <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>{{ t }}</option>
@@ -153,9 +154,7 @@ function initMap() {
   map.fitBounds(bounds, {padding:[50,50]});
 }
 
-// =====================
-// reset filtros al cambiar TAB
-// =====================
+// Reset filtros al cambiar TAB
 const tabSelect = document.getElementById("tab_select");
 const lastTabInput = document.getElementById("last_tab");
 tabSelect.addEventListener("change", () => {

@@ -85,8 +85,10 @@ def index():
     rows_all = data[1:]
     total_rows = len(rows_all)
 
-    # ====== columna de coordenadas ======
-    coord_idx = next((i for i, h in enumerate(headers) if "COORD" in h.upper()), None)
+    # ====== columnas especiales ======
+    coord_idx = find_col(headers, "COORDENADAS")
+    caja_idx = find_col(headers, "CAJA")
+    cuenta_idx = find_col(headers, "CUENTA")
 
     # ====== columnas para filtros ======
     if selected_tab in BRANCH_TABS:
@@ -98,15 +100,8 @@ def index():
     col2_idx = find_col(headers, col2_name)
 
     # ====== valores únicos para selects ======
-    filters1 = sorted({
-        r[col1_idx] for r in rows_all
-        if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
-    })
-
-    filters2 = sorted({
-        r[col2_idx] for r in rows_all
-        if col2_idx is not None and len(r) > col2_idx and r[col2_idx]
-    })
+    filters1 = sorted({r[col1_idx] for r in rows_all if col1_idx is not None and len(r) > col1_idx and r[col1_idx]})
+    filters2 = sorted({r[col2_idx] for r in rows_all if col2_idx is not None and len(r) > col2_idx and r[col2_idx]})
 
     # ====== filtrado de filas ======
     filtered_rows = []
@@ -116,47 +111,35 @@ def index():
         if selected_filter2 and r[col2_idx] != selected_filter2:
             continue
         filtered_rows.append(r)
-
     filtered_count = len(filtered_rows)
 
-    # ====== coordenadas para mapa con info de CAJA y CUENTA ======
+    # ====== coordenadas para mapa ======
     coords_info = []
     if coord_idx is not None:
-        caja_idx = find_col(headers, "CAJA")
-        cuenta_idx = find_col(headers, "CUENTA")
         for r in rows_all:
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
                 caja = r[caja_idx] if caja_idx is not None and len(r) > caja_idx else ""
                 cuenta = r[cuenta_idx] if cuenta_idx is not None and len(r) > cuenta_idx else ""
-                coords_info.append({
-                    "lat": lat,
-                    "lng": lng,
-                    "caja": caja,
-                    "cuenta": cuenta
-                })
+                coords_info.append({"lat": lat, "lng": lng, "caja": caja, "cuenta": cuenta})
             except:
                 pass
 
     # ====== ocultar columnas ======
     hidden_idxs = set()
-
-    # PENDIENTES ODN: ocultar columna CAJA
-    if selected_tab == "PENDIENTES ODN":
-        caja_idx = find_col(headers, "CAJA")
-        if caja_idx is not None:
-            hidden_idxs.add(caja_idx)
-
-    # Siempre ocultar columna LINK
+    # PENDIENTES ODN: ocultar CAJA
+    if selected_tab == "PENDIENTES ODN" and caja_idx is not None:
+        hidden_idxs.add(caja_idx)
+    # Siempre ocultar columnas LINK
     hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
 
-    # ONLINE LIMA: no mostrar columna MAPA
-    show_map_column = selected_tab != "ONLINE LIMA" and coord_idx is not None
+    # ONLINE LIMA: no mostrar MAPA
+    show_map_column = coord_idx is not None and selected_tab != "ONLINE LIMA"
 
-    # Construir headers visibles
+    # headers visibles
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
 
-    # Construir filas con links
+    # filas con links
     rows_with_links = []
     for r in filtered_rows:
         visible_row = [c for i, c in enumerate(r) if i not in hidden_idxs]
@@ -180,7 +163,7 @@ def index():
         coords_info=coords_info,
         has_coords=coord_idx is not None,
         is_branch_tab=selected_tab in BRANCH_TABS,
-        show_map_column=show_map_column  # control columna MAPA
+        show_map_column=show_map_column
     )
 
 if __name__ == "__main__":
