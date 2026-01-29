@@ -101,8 +101,6 @@ tr:nth-child(even){ background:#020617 }
     <td class="map-cell">
       {% if link %}
         <a href="{{ link }}" target="_blank">📍 Ver mapa</a>
-      {% else %}
-        📍 Ver mapa
       {% endif %}
     </td>
   {% endif %}
@@ -119,7 +117,7 @@ function toggleMap() {
   c.style.display = c.style.display === "none" ? "block" : "none";
   if (c.style.display === "block") {
     initMap();
-    setTimeout(() => { map.invalidateSize(); }, 200);
+    setTimeout(() => map.invalidateSize(), 200);
   }
 }
 
@@ -136,30 +134,29 @@ function initMap() {
   }
 
   const bounds = [];
+
   coordsInfo.forEach(p => {
-    const clientesMismaCaja = coordsInfo
+    const clientes = coordsInfo
       .filter(x => x.caja === p.caja)
       .map(x => x.cuenta)
       .filter(Boolean);
 
-    const popupText = `<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${clientesMismaCaja.join(", ")}`;
+    const popup = `<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${clientes.join(", ")}`;
 
     L.marker([p.lat, p.lng])
       .addTo(map)
-      .bindPopup(popupText);
+      .bindPopup(popup);
 
     bounds.push([p.lat, p.lng]);
   });
 
-  map.fitBounds(bounds, {padding:[50,50]});
+  map.fitBounds(bounds, { padding:[50,50] });
 }
 
-// Reset filtros al cambiar TAB
-const tabSelect = document.getElementById("tab_select");
-const lastTabInput = document.getElementById("last_tab");
-tabSelect.addEventListener("change", () => {
-  lastTabInput.value = "";
-  tabSelect.form.submit();
+// reset filtros al cambiar tab
+document.getElementById("tab_select").addEventListener("change", e => {
+  document.getElementById("last_tab").value = "";
+  e.target.form.submit();
 });
 </script>
 

@@ -61,6 +61,13 @@ def find_col(headers, expected_name):
             return i
     return None
 
+# 🔴 IMPORTANTE: columna exacta
+def find_col_exact(headers, expected_name):
+    for i, h in enumerate(headers):
+        if h.strip().upper() == expected_name.upper():
+            return i
+    return None
+
 # =====================
 # ROUTE
 # =====================
@@ -68,7 +75,6 @@ def find_col(headers, expected_name):
 def index():
     tabs = [ws.title for ws in sheet.worksheets()]
 
-    # ====== obtener valores del formulario ======
     selected_tab = request.args.get("tab", tabs[0])
     last_tab = request.args.get("last_tab", "")
     selected_filter1 = request.args.get("filter1", "")
@@ -78,19 +84,18 @@ def index():
         selected_filter1 = ""
         selected_filter2 = ""
 
-    # ====== obtener datos del sheet ======
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
     total_rows = len(rows_all)
 
-    # ====== columnas especiales ======
+    # ===== columnas clave =====
     coord_idx = find_col(headers, "COORDENADAS")
-    caja_idx = find_col(headers, "CAJA")
+    caja_idx = find_col_exact(headers, "CAJA")      # 👈 FIX
     cuenta_idx = find_col(headers, "CUENTA")
 
-    # ====== columnas para filtros ======
+    # ===== filtros =====
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
     else:
@@ -99,11 +104,10 @@ def index():
     col1_idx = find_col(headers, col1_name)
     col2_idx = find_col(headers, col2_name)
 
-    # ====== valores únicos para selects ======
     filters1 = sorted({r[col1_idx] for r in rows_all if col1_idx is not None and len(r) > col1_idx and r[col1_idx]})
     filters2 = sorted({r[col2_idx] for r in rows_all if col2_idx is not None and len(r) > col2_idx and r[col2_idx]})
 
-    # ====== filtrado de filas ======
+    # ===== aplicar filtros =====
     filtered_rows = []
     for r in rows_all:
         if selected_filter1 and r[col1_idx] != selected_filter1:
@@ -111,33 +115,35 @@ def index():
         if selected_filter2 and r[col2_idx] != selected_filter2:
             continue
         filtered_rows.append(r)
+
     filtered_count = len(filtered_rows)
 
-    # ====== coordenadas para mapa ======
+    # ===== coordenadas SOLO FILTRADAS =====
     coords_info = []
     if coord_idx is not None:
-        for r in rows_all:
+        for r in filtered_rows:
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
                 caja = r[caja_idx] if caja_idx is not None and len(r) > caja_idx else ""
                 cuenta = r[cuenta_idx] if cuenta_idx is not None and len(r) > cuenta_idx else ""
-                coords_info.append({"lat": lat, "lng": lng, "caja": caja, "cuenta": cuenta})
+                coords_info.append({
+                    "lat": lat,
+                    "lng": lng,
+                    "caja": caja,
+                    "cuenta": cuenta
+                })
             except:
                 pass
 
-    # ====== ocultar columnas ======
+    # ===== ocultar columnas =====
     hidden_idxs = set()
     if selected_tab == "PENDIENTES ODN" and caja_idx is not None:
         hidden_idxs.add(caja_idx)
+
     hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
 
-    # Mostrar columna MAPA si hay coordenadas
-    show_map_column = coord_idx is not None
-
-    # headers visibles
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
 
-    # filas con links → **revisar PENDIENTES ODN**
     rows_with_links = []
     for r in filtered_rows:
         visible_row = [c for i, c in enumerate(r) if i not in hidden_idxs]
@@ -159,11 +165,10 @@ def index():
         selected_filter2=selected_filter2,
         total_rows=total_rows,
         filtered_count=filtered_count,
-        all_coords=coords_info,
         coords_info=coords_info,
         has_coords=coord_idx is not None,
         is_branch_tab=selected_tab in BRANCH_TABS,
-        show_map_column=show_map_column
+        show_map_column=coord_idx is not None
     )
 
 if __name__ == "__main__":
