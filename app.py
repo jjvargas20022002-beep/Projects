@@ -68,32 +68,28 @@ def find_col(headers, expected_name):
 def index():
     tabs = [ws.title for ws in sheet.worksheets()]
 
-    # selecciona tab y filtros desde los args
+    # ====== obtener valores del formulario ======
     selected_tab = request.args.get("tab", tabs[0])
-    last_tab = request.args.get("last_tab", selected_tab)
+    last_tab = request.args.get("last_tab", "")  # tab anterior
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
-    # si cambió de tab, resetear filtros
+    # ====== si cambió el tab, resetear filtros ======
     if selected_tab != last_tab:
         selected_filter1 = ""
         selected_filter2 = ""
 
+    # ====== obtener datos del sheet ======
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
-
     headers = data[0]
     rows_all = data[1:]
     total_rows = len(rows_all)
 
-    # =====================
-    # COORDENADAS
-    # =====================
+    # ====== columna de coordenadas ======
     coord_idx = next((i for i, h in enumerate(headers) if "COORD" in h.upper()), None)
 
-    # =====================
-    # COLUMNAS PARA FILTROS
-    # =====================
+    # ====== columnas para filtros ======
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
     else:
@@ -102,9 +98,7 @@ def index():
     col1_idx = find_col(headers, col1_name)
     col2_idx = find_col(headers, col2_name)
 
-    # =====================
-    # VALORES PARA SELECTS
-    # =====================
+    # ====== valores únicos para selects ======
     filters1 = sorted({
         r[col1_idx] for r in rows_all
         if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
@@ -115,9 +109,7 @@ def index():
         if col2_idx is not None and len(r) > col2_idx and r[col2_idx]
     })
 
-    # =====================
-    # FILTRADO TABLA
-    # =====================
+    # ====== filtrado de filas ======
     filtered_rows = []
     for r in rows_all:
         if selected_filter1 and r[col1_idx] != selected_filter1:
@@ -128,9 +120,7 @@ def index():
 
     filtered_count = len(filtered_rows)
 
-    # =====================
-    # MAPA (TODAS LAS COORDENADAS)
-    # =====================
+    # ====== coordenadas para mapa ======
     all_coords = []
     if coord_idx is not None:
         for r in rows_all:
@@ -140,9 +130,7 @@ def index():
             except:
                 pass
 
-    # =====================
-    # OCULTAR COLUMNAS
-    # =====================
+    # ====== ocultar columnas ======
     hidden_idxs = {coord_idx} if coord_idx is not None else set()
     hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
 
@@ -158,7 +146,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab=selected_tab,   # 👈 importante
+        last_tab=selected_tab,  # clave para resetear filtros al cambiar tab
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
