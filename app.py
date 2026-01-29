@@ -70,11 +70,10 @@ def index():
 
     # ====== obtener valores del formulario ======
     selected_tab = request.args.get("tab", tabs[0])
-    last_tab = request.args.get("last_tab", "")  # tab anterior enviado desde frontend
+    last_tab = request.args.get("last_tab", "")
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
-    # ====== si cambió el tab, resetear filtros ======
     if last_tab != selected_tab:
         selected_filter1 = ""
         selected_filter2 = ""
@@ -140,11 +139,24 @@ def index():
                 pass
 
     # ====== ocultar columnas ======
-    hidden_idxs = {coord_idx} if coord_idx is not None else set()
+    hidden_idxs = set()
+
+    # PENDIENTES ODN: ocultar columna CAJA
+    if selected_tab == "PENDIENTES ODN":
+        caja_idx = find_col(headers, "CAJA")
+        if caja_idx is not None:
+            hidden_idxs.add(caja_idx)
+
+    # Siempre ocultar columna LINK
     hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
 
+    # ONLINE LIMA: no mostrar columna MAPA
+    show_map_column = selected_tab != "ONLINE LIMA" and coord_idx is not None
+
+    # Construir headers visibles
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
 
+    # Construir filas con links
     rows_with_links = []
     for r in filtered_rows:
         visible_row = [c for i, c in enumerate(r) if i not in hidden_idxs]
@@ -155,7 +167,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab="",  # siempre vacío para resetear filtros al cambiar de TAB
+        last_tab="",
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
@@ -164,10 +176,11 @@ def index():
         selected_filter2=selected_filter2,
         total_rows=total_rows,
         filtered_count=filtered_count,
-        all_coords=coords_info,   # se usa también para centrar mapa
-        coords_info=coords_info,  # NUEVO: info CAJA y CUENTA
+        all_coords=coords_info,
+        coords_info=coords_info,
         has_coords=coord_idx is not None,
         is_branch_tab=selected_tab in BRANCH_TABS,
+        show_map_column=show_map_column  # control columna MAPA
     )
 
 if __name__ == "__main__":

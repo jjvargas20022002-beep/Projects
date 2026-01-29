@@ -84,7 +84,9 @@ tr:nth-child(even){ background:#020617 }
   {% for h in headers %}
     <th>{{ h }}</th>
   {% endfor %}
-  <th>MAPA</th>
+  {% if show_map_column %}
+    <th>MAPA</th>
+  {% endif %}
 </tr>
 </thead>
 
@@ -94,13 +96,15 @@ tr:nth-child(even){ background:#020617 }
   {% for c in row %}
     <td>{{ c }}</td>
   {% endfor %}
-  <td class="map-cell">
-    {% if link %}
-      <a href="{{ link }}" target="_blank">📍 Ver mapa</a>
-    {% else %}
-      —
-    {% endif %}
-  </td>
+  {% if show_map_column %}
+    <td class="map-cell">
+      {% if link %}
+        <a href="{{ link }}" target="_blank">📍 Ver mapa</a>
+      {% else %}
+        —
+      {% endif %}
+    </td>
+  {% endif %}
 </tr>
 {% endfor %}
 </tbody>
@@ -112,7 +116,6 @@ let map;
 function toggleMap() {
   const c = document.getElementById("map-container");
   c.style.display = c.style.display === "none" ? "block" : "none";
-
   if (c.style.display === "block") {
     initMap();
     setTimeout(() => { map.invalidateSize(); }, 200);
@@ -132,9 +135,7 @@ function initMap() {
   }
 
   const bounds = [];
-
   coordsInfo.forEach(p => {
-    // Obtener todos los clientes con la misma caja
     const clientesMismaCaja = coordsInfo
       .filter(x => x.caja === p.caja)
       .map(x => x.cuenta)
