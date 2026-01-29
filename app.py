@@ -51,10 +51,8 @@ def coord_to_link(value):
     except:
         return None
 
-
 def normalize(text):
     return text.upper().replace(" ", "").replace("_", "").replace("DE", "")
-
 
 def find_col(headers, expected_name):
     expected = normalize(expected_name)
@@ -62,7 +60,6 @@ def find_col(headers, expected_name):
         if expected == normalize(h) or expected in normalize(h):
             return i
     return None
-
 
 # =====================
 # ROUTE
@@ -162,7 +159,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab=selected_tab,   # 👈 CLAVE
+        last_tab=selected_tab,   # 👈 importante para filtrar correctamente
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
@@ -175,7 +172,6 @@ def index():
         has_coords=coord_idx is not None,
         is_branch_tab=selected_tab in BRANCH_TABS,
     )
-
 
 if __name__ == "__main__":
     app.run(debug=True)
