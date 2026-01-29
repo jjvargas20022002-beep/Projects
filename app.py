@@ -120,13 +120,22 @@ def index():
 
     filtered_count = len(filtered_rows)
 
-    # ====== coordenadas para mapa ======
-    all_coords = []
+    # ====== coordenadas para mapa con info de CAJA y CUENTA ======
+    coords_info = []
     if coord_idx is not None:
+        caja_idx = find_col(headers, "CAJA")
+        cuenta_idx = find_col(headers, "CUENTA")
         for r in rows_all:
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
-                all_coords.append({"lat": lat, "lng": lng})
+                caja = r[caja_idx] if caja_idx is not None and len(r) > caja_idx else ""
+                cuenta = r[cuenta_idx] if cuenta_idx is not None and len(r) > cuenta_idx else ""
+                coords_info.append({
+                    "lat": lat,
+                    "lng": lng,
+                    "caja": caja,
+                    "cuenta": cuenta
+                })
             except:
                 pass
 
@@ -146,7 +155,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab="",  # siempre vacío para que cada cambio de TAB resetee filtros
+        last_tab="",  # siempre vacío para resetear filtros al cambiar de TAB
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
@@ -155,7 +164,8 @@ def index():
         selected_filter2=selected_filter2,
         total_rows=total_rows,
         filtered_count=filtered_count,
-        all_coords=all_coords,
+        all_coords=coords_info,   # se usa también para centrar mapa
+        coords_info=coords_info,  # NUEVO: info CAJA y CUENTA
         has_coords=coord_idx is not None,
         is_branch_tab=selected_tab in BRANCH_TABS,
     )

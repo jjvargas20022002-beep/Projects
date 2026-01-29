@@ -8,41 +8,15 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <style>
-body {
-  background:#0f172a;
-  color:#e5e7eb;
-  font-family:Arial;
-  padding:20px
-}
-.filters {
-  display:flex;
-  gap:12px;
-  flex-wrap:wrap;
-  margin-bottom:15px
-}
-select, button {
-  padding:6px;
-  background:#020617;
-  color:#e5e7eb;
-  border:1px solid #334155
-}
-table {
-  width:100%;
-  border-collapse:collapse;
-  font-size:13px
-}
-th, td {
-  border:1px solid #334155;
-  padding:6px
-}
+body { background:#0f172a; color:#e5e7eb; font-family:Arial; padding:20px }
+.filters { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:15px }
+select, button { padding:6px; background:#020617; color:#e5e7eb; border:1px solid #334155 }
+table { width:100%; border-collapse:collapse; font-size:13px }
+th, td { border:1px solid #334155; padding:6px }
 th { background:#1e293b }
 tr:nth-child(even){ background:#020617 }
 .map-cell { white-space:nowrap }
-#map {
-  height:400px;
-  border-radius:8px;
-  margin-bottom:15px
-}
+#map { height:400px; border-radius:8px; margin-bottom:15px }
 </style>
 </head>
 
@@ -58,15 +32,10 @@ tr:nth-child(even){ background:#020617 }
 </p>
 
 <form method="get" class="filters">
-  <!-- input hidden para enviar last_tab -->
   <input type="hidden" name="last_tab" id="last_tab" value="{{ selected_tab }}">
-
-  <!-- SELECT TAB -->
   <select name="tab" id="tab_select">
     {% for t in tabs %}
-      <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>
-        {{ t }}
-      </option>
+      <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>{{ t }}</option>
     {% endfor %}
   </select>
 
@@ -146,9 +115,7 @@ function toggleMap() {
 
   if (c.style.display === "block") {
     initMap();
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 200);
+    setTimeout(() => { map.invalidateSize(); }, 200);
   }
 }
 
@@ -158,30 +125,40 @@ function initMap() {
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
   }
 
-  const points = {{ all_coords | tojson }};
-  if (!points.length) {
-    map.setView([0, 0], 2);
+  const coordsInfo = {{ coords_info | tojson }};
+  if (!coordsInfo.length) {
+    map.setView([0,0],2);
     return;
   }
 
   const bounds = [];
-  points.forEach(p => {
-    L.marker([p.lat, p.lng]).addTo(map);
+
+  coordsInfo.forEach(p => {
+    // Obtener todos los clientes con la misma caja
+    const clientesMismaCaja = coordsInfo
+      .filter(x => x.caja === p.caja)
+      .map(x => x.cuenta)
+      .filter(Boolean);
+
+    const popupText = `<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${clientesMismaCaja.join(", ")}`;
+
+    L.marker([p.lat, p.lng])
+      .addTo(map)
+      .bindPopup(popupText);
+
     bounds.push([p.lat, p.lng]);
   });
 
-  map.fitBounds(bounds);
+  map.fitBounds(bounds, {padding:[50,50]});
 }
 
 // =====================
-// ACTUALIZAR last_tab al cambiar de tab
+// reset filtros al cambiar TAB
 // =====================
 const tabSelect = document.getElementById("tab_select");
 const lastTabInput = document.getElementById("last_tab");
-
 tabSelect.addEventListener("change", () => {
-  // ponemos el valor del tab ANTERIOR en last_tab
-  lastTabInput.value = ""; // al cambiar de tab, dejamos vacío para que backend detecte cambio
+  lastTabInput.value = "";
   tabSelect.form.submit();
 });
 </script>
