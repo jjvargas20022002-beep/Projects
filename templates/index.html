@@ -6,6 +6,7 @@
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
 
 <style>
 body { background:#0f172a; color:#e5e7eb; font-family:Arial; padding:20px }
@@ -111,6 +112,7 @@ tr:nth-child(even){ background:#020617 }
 
 <script>
 let map;
+let coberturaLayer;
 
 function toggleMap() {
   const c = document.getElementById("map-container");
@@ -124,12 +126,37 @@ function toggleMap() {
 function initMap() {
   if (!map) {
     map = L.map("map");
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+      .addTo(map);
+
+    // =========================
+    // 🟦 COBERTURA KML
+    // =========================
+    coberturaLayer = omnivore.kml(
+      "/static/cobertura.kml",
+      null,
+      L.geoJSON(null, {
+        style: {
+          color: "#2563eb",
+          weight: 2,
+          fillColor: "#3b82f6",
+          fillOpacity: 0.25
+        }
+      })
+    )
+    .on("ready", function () {
+      map.fitBounds(coberturaLayer.getBounds());
+    })
+    .addTo(map);
   }
 
+  // =========================
+  // 📍 PINES
+  // =========================
   const coordsInfo = {{ coords_info | tojson }};
   if (!coordsInfo.length) {
-    map.setView([0,0],2);
+    map.setView([-9.19, -75.02], 6);
     return;
   }
 
@@ -141,7 +168,10 @@ function initMap() {
       .map(x => x.cuenta)
       .filter(Boolean);
 
-    const popup = `<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${clientes.join(", ")}`;
+    const popup = `
+      <b>CAJA:</b> ${p.caja}<br>
+      <b>CLIENTES:</b> ${clientes.join(", ")}
+    `;
 
     L.marker([p.lat, p.lng])
       .addTo(map)
@@ -150,7 +180,9 @@ function initMap() {
     bounds.push([p.lat, p.lng]);
   });
 
-  map.fitBounds(bounds, { padding:[50,50] });
+  if (bounds.length) {
+    map.fitBounds(bounds, { padding: [50, 50] });
+  }
 }
 
 // reset filtros al cambiar tab
