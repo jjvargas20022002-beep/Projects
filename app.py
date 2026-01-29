@@ -127,10 +127,8 @@ def index():
 
     # ====== ocultar columnas ======
     hidden_idxs = set()
-    # PENDIENTES ODN: ocultar CAJA
     if selected_tab == "PENDIENTES ODN" and caja_idx is not None:
         hidden_idxs.add(caja_idx)
-    # Siempre ocultar columnas LINK
     hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
 
     # Mostrar columna MAPA si hay coordenadas
@@ -139,7 +137,7 @@ def index():
     # headers visibles
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
 
-    # filas con links
+    # filas con links → **revisar PENDIENTES ODN**
     rows_with_links = []
     for r in filtered_rows:
         visible_row = [c for i, c in enumerate(r) if i not in hidden_idxs]
