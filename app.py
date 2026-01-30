@@ -40,6 +40,8 @@ BRANCH_TABS = [
     "PENDIENTES ODN",
 ]
 
+SINGLE_BRANCH_TAB = "ONLINE LIMA"
+
 # =====================
 # UTILS
 # =====================
@@ -89,20 +91,27 @@ def index():
     rows_all = data[1:]
     total_rows = len(rows_all)
 
-    # ===== columnas =====
+    # ===== columnas comunes =====
     coord_idx = find_col(headers, "COORDENADAS")
     caja_idx = find_col_exact(headers, "CAJA")
     cuenta_idx = find_col(headers, "CUENTA")
     status_idx = find_col(headers, "STATUS DE LA CAJA")
 
-    # ===== filtros según tab =====
+    # ===== definición de filtros por TAB =====
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
+        use_filter2 = True
+
+    elif selected_tab == SINGLE_BRANCH_TAB:
+        col1_name, col2_name = "BRANCH", None
+        use_filter2 = False
+
     else:
         col1_name, col2_name = "SITE", "REPORTE CONTRATA"
+        use_filter2 = True
 
     col1_idx = find_col(headers, col1_name)
-    col2_idx = find_col(headers, col2_name)
+    col2_idx = find_col(headers, col2_name) if col2_name else None
 
     # ===== FILTRO 1 =====
     if col1_idx is not None and selected_filter1:
@@ -110,23 +119,24 @@ def index():
     else:
         rows_after_f1 = rows_all
 
-    # opciones filtro 2
-    filters2 = sorted({
-        r[col2_idx] for r in rows_after_f1
-        if col2_idx is not None and len(r) > col2_idx and r[col2_idx]
-    })
-
     # ===== FILTRO 2 =====
-    if col2_idx is not None and selected_filter2:
+    if use_filter2 and col2_idx is not None and selected_filter2:
         filtered_rows = [r for r in rows_after_f1 if len(r) > col2_idx and r[col2_idx] == selected_filter2]
     else:
         filtered_rows = rows_after_f1
 
-    # opciones filtro 1
+    # ===== opciones de filtros =====
     filters1 = sorted({
         r[col1_idx] for r in filtered_rows
         if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
     })
+
+    filters2 = []
+    if use_filter2 and col2_idx is not None:
+        filters2 = sorted({
+            r[col2_idx] for r in rows_after_f1
+            if len(r) > col2_idx and r[col2_idx]
+        })
 
     filtered_count = len(filtered_rows)
 
@@ -180,8 +190,9 @@ def index():
         filtered_count=filtered_count,
         coords_info=coords_info,
         has_coords=coord_idx is not None,
-        is_branch_tab=selected_tab in BRANCH_TABS,
-        show_map_column=coord_idx is not None
+        is_branch_tab=selected_tab in BRANCH_TABS or selected_tab == SINGLE_BRANCH_TAB,
+        show_map_column=coord_idx is not None,
+        use_filter2=use_filter2
     )
 
 if __name__ == "__main__":
