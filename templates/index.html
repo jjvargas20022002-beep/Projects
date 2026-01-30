@@ -111,8 +111,14 @@ tr:nth-child(even){ background:#020617 }
 </table>
 
 <script>
+const ICONS = {
+  green: new L.Icon({ iconUrl:"https://maps.google.com/mapfiles/ms/icons/green-dot.png", iconSize:[32,32]}),
+  red: new L.Icon({ iconUrl:"https://maps.google.com/mapfiles/ms/icons/red-dot.png", iconSize:[32,32]}),
+  yellow: new L.Icon({ iconUrl:"https://maps.google.com/mapfiles/ms/icons/yellow-dot.png", iconSize:[32,32]}),
+  blue: new L.Icon({ iconUrl:"https://maps.google.com/mapfiles/ms/icons/blue-dot.png", iconSize:[32,32]})
+};
+
 let map;
-let coberturaLayer;
 
 function toggleMap() {
   const c = document.getElementById("map-container");
@@ -126,43 +132,22 @@ function toggleMap() {
 function initMap() {
   if (!map) {
     map = L.map("map");
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
-      .addTo(map);
-
-    // =========================
-    // 🟦 COBERTURA KML
-    // =========================
-    coberturaLayer = omnivore.kml(
-      "/static/cobertura.kml",
-      null,
-      L.geoJSON(null, {
-        style: {
-          color: "#2563eb",
-          weight: 2,
-          fillColor: "#3b82f6",
-          fillOpacity: 0.25
-        }
-      })
-    )
-    .on("ready", function () {
-      map.fitBounds(coberturaLayer.getBounds());
-    })
-    .addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
   }
 
-  // =========================
-  // 📍 PINES
-  // =========================
   const coordsInfo = {{ coords_info | tojson }};
-  if (!coordsInfo.length) {
-    map.setView([-9.19, -75.02], 6);
-    return;
-  }
+  if (!coordsInfo.length) return;
 
   const bounds = [];
 
   coordsInfo.forEach(p => {
+    let icon = ICONS.blue;
+    const status = (p.status || "").toLowerCase();
+
+    if (status.includes("reparado")) icon = ICONS.green;
+    else if (status.includes("no plan")) icon = ICONS.red;
+    else if (status.includes("en plan")) icon = ICONS.yellow;
+
     const clientes = coordsInfo
       .filter(x => x.caja === p.caja)
       .map(x => x.cuenta)
@@ -170,22 +155,17 @@ function initMap() {
 
     const popup = `
       <b>CAJA:</b> ${p.caja}<br>
-      <b>CLIENTES:</b> ${clientes.join(", ")}
+      <b>CLIENTES:</b> ${clientes.join(", ")}<br>
+      <b>Estado de la caja:</b> ${p.status || "—"}
     `;
 
-    L.marker([p.lat, p.lng])
-      .addTo(map)
-      .bindPopup(popup);
-
+    L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup);
     bounds.push([p.lat, p.lng]);
   });
 
-  if (bounds.length) {
-    map.fitBounds(bounds, { padding: [50, 50] });
-  }
+  map.fitBounds(bounds, { padding:[50,50] });
 }
 
-// reset filtros al cambiar tab
 document.getElementById("tab_select").addEventListener("change", e => {
   document.getElementById("last_tab").value = "";
   e.target.form.submit();

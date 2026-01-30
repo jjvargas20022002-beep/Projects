@@ -79,7 +79,7 @@ def index():
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
-    # 🔴 CLAVE: resetear filtros al cambiar TAB
+    # 🔑 reset filtros al cambiar TAB
     if last_tab != selected_tab:
         selected_filter1 = ""
         selected_filter2 = ""
@@ -94,6 +94,7 @@ def index():
     coord_idx = find_col(headers, "COORDENADAS")
     caja_idx = find_col_exact(headers, "CAJA")
     cuenta_idx = find_col(headers, "CUENTA")
+    status_idx = find_col(headers, "STATUS DE LA CAJA")
 
     # ===== filtros según tab =====
     if selected_tab in BRANCH_TABS:
@@ -107,10 +108,9 @@ def index():
     # ===== FILTRO 1 =====
     rows_after_f1 = [
         r for r in rows_all
-        if not selected_filter1 or r[col1_idx] == selected_filter1
+        if col1_idx is not None and (not selected_filter1 or r[col1_idx] == selected_filter1)
     ]
 
-    # opciones filtro 2 (dependen del filtro 1)
     filters2 = sorted({
         r[col2_idx] for r in rows_after_f1
         if col2_idx is not None and len(r) > col2_idx and r[col2_idx]
@@ -119,10 +119,9 @@ def index():
     # ===== FILTRO 2 =====
     filtered_rows = [
         r for r in rows_after_f1
-        if not selected_filter2 or r[col2_idx] == selected_filter2
+        if col2_idx is not None and (not selected_filter2 or r[col2_idx] == selected_filter2)
     ]
 
-    # opciones filtro 1 (dependen del filtro 2)
     filters1 = sorted({
         r[col1_idx] for r in filtered_rows
         if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
@@ -130,7 +129,7 @@ def index():
 
     filtered_count = len(filtered_rows)
 
-    # ===== coordenadas (solo filtradas) =====
+    # ===== coordenadas =====
     coords_info = []
     if coord_idx is not None:
         for r in filtered_rows:
@@ -140,7 +139,8 @@ def index():
                     "lat": lat,
                     "lng": lng,
                     "caja": r[caja_idx] if caja_idx is not None else "",
-                    "cuenta": r[cuenta_idx] if cuenta_idx is not None else ""
+                    "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
+                    "status": r[status_idx] if status_idx is not None else "",
                 })
             except:
                 pass
@@ -148,15 +148,12 @@ def index():
     # ===== ocultar columnas =====
     hidden_idxs = set()
 
-    # ocultar coordenadas SIEMPRE
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
 
-    # ocultar caja solo en pendientes ODN
     if selected_tab == "PENDIENTES ODN" and caja_idx is not None:
         hidden_idxs.add(caja_idx)
 
-    # ocultar columnas tipo LINK
     hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
 
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
@@ -171,7 +168,7 @@ def index():
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
-        last_tab=selected_tab,   # 👈 CLAVE
+        last_tab=selected_tab,
         headers=visible_headers,
         rows_with_links=rows_with_links,
         filters1=filters1,
