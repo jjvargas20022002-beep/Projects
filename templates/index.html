@@ -2,6 +2,10 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+
+    <!-- 🔑 CLAVE PARA MÓVIL -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>WO Pendientes FTTH</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -49,6 +53,25 @@
             height:400px;
             border-radius:8px;
             margin-bottom:15px;
+        }
+
+        /* 📱 RESPONSIVE MÓVIL */
+        @media (max-width: 768px) {
+            body {
+                padding:12px;
+            }
+
+            .filters {
+                flex-direction: column;
+            }
+
+            select, button {
+                width: 100%;
+            }
+
+            #map {
+                height:280px;
+            }
         }
     </style>
 </head>
@@ -133,6 +156,8 @@
     <div id="map"></div>
 </div>
 
+<!-- 📱 SCROLL HORIZONTAL EN MÓVIL -->
+<div style="overflow-x:auto;">
 <table>
     <thead>
         <tr>
@@ -161,6 +186,7 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 
 <script>
 const ICONS = {
