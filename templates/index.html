@@ -119,6 +119,7 @@ const ICONS = {
 };
 
 let map;
+let coberturaLayer;
 
 function toggleMap() {
   const c = document.getElementById("map-container");
@@ -135,6 +136,31 @@ function initMap() {
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
   }
 
+  // =========================
+  // 🟦 COBERTURA KML
+  // =========================
+  if (!coberturaLayer) {
+    coberturaLayer = omnivore.kml(
+      "/static/cobertura.kml",
+      null,
+      L.geoJSON(null, {
+        style: {
+          color: "#2563eb",
+          weight: 2,
+          fillColor: "#3b82f6",
+          fillOpacity: 0.25
+        }
+      })
+    )
+    .on("ready", function () {
+      map.fitBounds(coberturaLayer.getBounds());
+    })
+    .addTo(map);
+  }
+
+  // =========================
+  // 📍 PINES
+  // =========================
   const coordsInfo = {{ coords_info | tojson }};
   if (!coordsInfo.length) return;
 
@@ -159,11 +185,16 @@ function initMap() {
       <b>Estado de la caja:</b> ${p.status || "—"}
     `;
 
-    L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup);
+    L.marker([p.lat, p.lng], { icon })
+      .addTo(map)
+      .bindPopup(popup);
+
     bounds.push([p.lat, p.lng]);
   });
 
-  map.fitBounds(bounds, { padding:[50,50] });
+  if (bounds.length) {
+    map.fitBounds(bounds, { padding:[50,50] });
+  }
 }
 
 document.getElementById("tab_select").addEventListener("change", e => {
