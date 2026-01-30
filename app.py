@@ -37,7 +37,6 @@ BRANCH_TABS = [
     "GARANTIAS PROVINCIA",
     "FUERA DE GARANTÍA PROVINCIA",
     "CANCELADOS",
-    "ONLINE LIMA",
     "PENDIENTES ODN",
 ]
 
@@ -106,22 +105,24 @@ def index():
     col2_idx = find_col(headers, col2_name)
 
     # ===== FILTRO 1 =====
-    rows_after_f1 = [
-        r for r in rows_all
-        if col1_idx is not None and (not selected_filter1 or r[col1_idx] == selected_filter1)
-    ]
+    if col1_idx is not None and selected_filter1:
+        rows_after_f1 = [r for r in rows_all if len(r) > col1_idx and r[col1_idx] == selected_filter1]
+    else:
+        rows_after_f1 = rows_all
 
+    # opciones filtro 2
     filters2 = sorted({
         r[col2_idx] for r in rows_after_f1
         if col2_idx is not None and len(r) > col2_idx and r[col2_idx]
     })
 
     # ===== FILTRO 2 =====
-    filtered_rows = [
-        r for r in rows_after_f1
-        if col2_idx is not None and (not selected_filter2 or r[col2_idx] == selected_filter2)
-    ]
+    if col2_idx is not None and selected_filter2:
+        filtered_rows = [r for r in rows_after_f1 if len(r) > col2_idx and r[col2_idx] == selected_filter2]
+    else:
+        filtered_rows = rows_after_f1
 
+    # opciones filtro 1
     filters1 = sorted({
         r[col1_idx] for r in filtered_rows
         if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
