@@ -16,7 +16,6 @@ table { width:100%; border-collapse:collapse; font-size:13px }
 th, td { border:1px solid #334155; padding:6px }
 th { background:#1e293b }
 tr:nth-child(even){ background:#020617 }
-.map-cell { white-space:nowrap }
 #map { height:400px; border-radius:8px; margin-bottom:15px }
 </style>
 </head>
@@ -41,48 +40,6 @@ tr:nth-child(even){ background:#020617 }
     {% endfor %}
   </select>
 
-  {% if selected_tab == "ONLINE LIMA" %}
-    <!-- SOLO BRANCH -->
-    <select name="filter1" onchange="this.form.submit()">
-      <option value="">BRANCH</option>
-      {% for f in filters1 %}
-        <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
-      {% endfor %}
-    </select>
-
-  {% elif is_branch_tab %}
-    <!-- BRANCH + CONTRATA -->
-    <select name="filter1" onchange="this.form.submit()">
-      <option value="">BRANCH</option>
-      {% for f in filters1 %}
-        <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
-      {% endfor %}
-    </select>
-
-    <select name="filter2" onchange="this.form.submit()">
-      <option value="">CONTRATA</option>
-      {% for f in filters2 %}
-        <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
-      {% endfor %}
-    </select>
-
-  {% else %}
-    <!-- SITE + REPORTE CONTRATA -->
-    <select name="filter1" onchange="this.form.submit()">
-      <option value="">SITE</option>
-      {% for f in filters1 %}
-        <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
-      {% endfor %}
-    </select>
-
-    <select name="filter2" onchange="this.form.submit()">
-      <option value="">REPORTE CONTRATA</option>
-      {% for f in filters2 %}
-        <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
-      {% endfor %}
-    </select>
-  {% endif %}
-
   {% if has_coords %}
     <button type="button" onclick="toggleMap()">🗺️ Mapa</button>
   {% endif %}
@@ -92,37 +49,9 @@ tr:nth-child(even){ background:#020617 }
   <div id="map"></div>
 </div>
 
-<table>
-<thead>
-<tr>
-  {% for h in headers %}
-    <th>{{ h }}</th>
-  {% endfor %}
-  {% if show_map_column %}
-    <th>MAPA</th>
-  {% endif %}
-</tr>
-</thead>
-
-<tbody>
-{% for row, link in rows_with_links %}
-<tr>
-  {% for c in row %}
-    <td>{{ c }}</td>
-  {% endfor %}
-  {% if show_map_column %}
-    <td class="map-cell">
-      {% if link %}
-        <a href="{{ link }}" target="_blank">📍 Ver mapa</a>
-      {% endif %}
-    </td>
-  {% endif %}
-</tr>
-{% endfor %}
-</tbody>
-</table>
-
 <script>
+const selectedTab = "{{ selected_tab }}";
+
 const ICONS = {
   green: new L.Icon({ iconUrl:"https://maps.google.com/mapfiles/ms/icons/green-dot.png", iconSize:[32,32]}),
   red: new L.Icon({ iconUrl:"https://maps.google.com/mapfiles/ms/icons/red-dot.png", iconSize:[32,32]}),
@@ -149,55 +78,32 @@ function initMap() {
   }
 
   if (!coberturaLayer) {
-    coberturaLayer = omnivore.kml(
-      "/static/cobertura.kml",
-      null,
-      L.geoJSON(null, {
-        style: {
-          color: "#2563eb",
-          weight: 2,
-          fillColor: "#3b82f6",
-          fillOpacity: 0.25
-        }
-      })
-    )
-    .on("ready", function () {
-      map.fitBounds(coberturaLayer.getBounds());
-    })
-    .addTo(map);
+    coberturaLayer = omnivore.kml("/static/cobertura.kml").addTo(map);
   }
 
   const coordsInfo = {{ coords_info | tojson }};
   if (!coordsInfo.length) return;
 
-  const bounds = [];
-
   coordsInfo.forEach(p => {
-    let icon = ICONS.blue;
-    const status = (p.status || "").toLowerCase();
 
-    if (status.includes("reparado")) icon = ICONS.green;
-    else if (status.includes("no plan")) icon = ICONS.red;
-    else if (status.includes("en plan")) icon = ICONS.yellow;
+    let popup = `<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${p.cuenta}`;
 
-    const clientes = coordsInfo
-      .filter(x => x.caja === p.caja)
-      .map(x => x.cuenta)
-      .filter(Boolean);
+    if (selectedTab === "PENDIENTES ODN") {
+      popup += `<br><b>Estado de la caja:</b> ${p.status || "—"}`;
+    }
 
-    const popup = `
-      <b>CAJA:</b> ${p.caja}<br>
-      <b>CLIENTES:</b> ${clientes.join(", ")}<br>
-      <b>Estado de la caja:</b> ${p.status || "—"}
-    `;
+    if ([
+      "LI1 TGI","LI2 ERAM","LI2 DIJUSA",
+      "LI3 INTER","LI4 BROKERS","LI4 TGI","LI7 MARCOS"
+    ].includes(selectedTab)) {
+      popup += `<br><b>Estado de la caja:</b> ${p.estado || "—"}`;
+      popup += `<br><b>Reporte de Contrata:</b> ${p.reporte || "—"}`;
+    }
 
-    L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup);
-    bounds.push([p.lat, p.lng]);
+    L.marker([p.lat, p.lng], { icon: ICONS.blue })
+      .addTo(map)
+      .bindPopup(popup);
   });
-
-  if (bounds.length) {
-    map.fitBounds(bounds, { padding:[50,50] });
-  }
 }
 
 document.getElementById("tab_select").addEventListener("change", e => {
