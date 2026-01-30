@@ -42,11 +42,6 @@ BRANCH_TABS = [
 
 SINGLE_BRANCH_TAB = "ONLINE LIMA"
 
-SPECIAL_TABS = [
-    "LI1 TGI", "LI2 ERAM", "LI2 DIJUSA",
-    "LI3 INTER", "LI4 BROKERS", "LI4 TGI", "LI7 MARCOS"
-]
-
 # =====================
 # UTILS
 # =====================
@@ -57,8 +52,10 @@ def coord_to_link(value):
     except:
         return None
 
+
 def normalize(text):
     return text.upper().replace(" ", "").replace("_", "").replace("DE", "")
+
 
 def find_col(headers, expected_name):
     expected = normalize(expected_name)
@@ -67,11 +64,13 @@ def find_col(headers, expected_name):
             return i
     return None
 
+
 def find_col_exact(headers, expected_name):
     for i, h in enumerate(headers):
         if h.strip().upper() == expected_name.upper():
             return i
     return None
+
 
 # =====================
 # ROUTE
@@ -79,32 +78,30 @@ def find_col_exact(headers, expected_name):
 @app.route("/")
 def index():
     tabs = [ws.title for ws in sheet.worksheets()]
-
     selected_tab = request.args.get("tab", tabs[0])
     last_tab = request.args.get("last_tab", "")
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
+    # 🔑 reset filtros al cambiar TAB
     if last_tab != selected_tab:
         selected_filter1 = ""
         selected_filter2 = ""
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
+
     headers = data[0]
     rows_all = data[1:]
     total_rows = len(rows_all)
 
-    # ===== columnas =====
+    # ===== columnas comunes =====
     coord_idx = find_col(headers, "COORDENADAS")
     caja_idx = find_col_exact(headers, "CAJA")
     cuenta_idx = find_col(headers, "CUENTA")
-
     status_idx = find_col(headers, "STATUS DE LA CAJA")
-    estado_idx = find_col(headers, "ESTADO DE CAJA")
-    reporte_idx = find_col(headers, "REPORTE DE CONTRATA")
 
-    # ===== filtros =====
+    # ===== definición de filtros por TAB =====
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
         use_filter2 = True
@@ -118,13 +115,36 @@ def index():
     col1_idx = find_col(headers, col1_name)
     col2_idx = find_col(headers, col2_name) if col2_name else None
 
-    rows_after_f1 = rows_all if not selected_filter1 else [
-        r for r in rows_all if len(r) > col1_idx and r[col1_idx] == selected_filter1
-    ]
+    # ===== FILTRO 1 =====
+    if col1_idx is not None and selected_filter1:
+        rows_after_f1 = [
+            r for r in rows_all
+            if len(r) > col1_idx and r[col1_idx] == selected_filter1
+        ]
+    else:
+        rows_after_f1 = rows_all
 
-    filtered_rows = rows_after_f1 if not selected_filter2 else [
-        r for r in rows_after_f1 if len(r) > col2_idx and r[col2_idx] == selected_filter2
-    ]
+    # ===== FILTRO 2 =====
+    if use_filter2 and col2_idx is not None and selected_filter2:
+        filtered_rows = [
+            r for r in rows_after_f1
+            if len(r) > col2_idx and r[col2_idx] == selected_filter2
+        ]
+    else:
+        filtered_rows = rows_after_f1
+
+    # ===== opciones de filtros =====
+    filters1 = sorted({
+        r[col1_idx] for r in filtered_rows
+        if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
+    })
+
+    filters2 = []
+    if use_filter2 and col2_idx is not None:
+        filters2 = sorted({
+            r[col2_idx] for r in rows_after_f1
+            if len(r) > col2_idx and r[col2_idx]
+        })
 
     filtered_count = len(filtered_rows)
 
@@ -140,29 +160,12 @@ def index():
                     "caja": r[caja_idx] if caja_idx is not None else "",
                     "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
                     "status": r[status_idx] if status_idx is not None else "",
-                    "estado": r[estado_idx] if estado_idx is not None else "",
-                    "reporte": r[reporte_idx] if reporte_idx is not None else "",
                 })
             except:
                 pass
 
-    return render_template(
-        "index.html",
-        tabs=tabs,
-        selected_tab=selected_tab,
-        last_tab=selected_tab,
-        headers=headers,
-        rows_with_links=[],
-        filters1=[],
-        filters2=[],
-        selected_filter1=selected_filter1,
-        selected_filter2=selected_filter2,
-        total_rows=total_rows,
-        filtered_count=filtered_count,
-        coords_info=coords_info,
-        has_coords=coord_idx is not None,
-        show_map_column=coord_idx is not None
-    )
+    # ===== ocultar columnas =====
+    hidden_idxs = set()
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    if coord_idx is not None:
+        hidden_idxs.add(coord_idx)
