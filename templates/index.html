@@ -176,7 +176,6 @@ let coberturaLayer;
 function toggleMap() {
     const c = document.getElementById("map-container");
     c.style.display = c.style.display === "none" ? "block" : "none";
-
     if (c.style.display === "block") {
         initMap();
         setTimeout(() => map.invalidateSize(), 200);
@@ -230,4 +229,20 @@ function initMap() {
             <b>Estado de la caja:</b> ${p.status || "—"}
         `;
 
-        L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(
+        L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup);
+        bounds.push([p.lat, p.lng]);
+    });
+
+    if (bounds.length) {
+        map.fitBounds(bounds, { padding:[50,50] });
+    }
+}
+
+document.getElementById("tab_select").addEventListener("change", e => {
+    document.getElementById("last_tab").value = "";
+    e.target.form.submit();
+});
+</script>
+
+</body>
+</html>

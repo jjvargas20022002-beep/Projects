@@ -135,14 +135,16 @@ def index():
 
     # ===== opciones de filtros =====
     filters1 = sorted({
-        r[col1_idx] for r in filtered_rows
+        r[col1_idx]
+        for r in filtered_rows
         if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
     })
 
     filters2 = []
     if use_filter2 and col2_idx is not None:
         filters2 = sorted({
-            r[col2_idx] for r in rows_after_f1
+            r[col2_idx]
+            for r in rows_after_f1
             if len(r) > col2_idx and r[col2_idx]
         })
 
@@ -169,3 +171,44 @@ def index():
 
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
+
+    if selected_tab == "PENDIENTES ODN" and caja_idx is not None:
+        hidden_idxs.add(caja_idx)
+
+    hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
+
+    visible_headers = [
+        h for i, h in enumerate(headers) if i not in hidden_idxs
+    ]
+
+    rows_with_links = []
+    for r in filtered_rows:
+        visible_row = [
+            c for i, c in enumerate(r) if i not in hidden_idxs
+        ]
+        link = coord_to_link(r[coord_idx]) if coord_idx is not None else None
+        rows_with_links.append((visible_row, link))
+
+    return render_template(
+        "index.html",
+        tabs=tabs,
+        selected_tab=selected_tab,
+        last_tab=selected_tab,
+        headers=visible_headers,
+        rows_with_links=rows_with_links,
+        filters1=filters1,
+        filters2=filters2,
+        selected_filter1=selected_filter1,
+        selected_filter2=selected_filter2,
+        total_rows=total_rows,
+        filtered_count=filtered_count,
+        coords_info=coords_info,
+        has_coords=coord_idx is not None,
+        is_branch_tab=selected_tab in BRANCH_TABS or selected_tab == SINGLE_BRANCH_TAB,
+        show_map_column=coord_idx is not None,
+        use_filter2=use_filter2,
+    )
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
