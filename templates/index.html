@@ -41,32 +41,44 @@ tr:nth-child(even){ background:#020617 }
     {% endfor %}
   </select>
 
-  {% if is_branch_tab %}
+  {% if selected_tab == "ONLINE LIMA" %}
+    <!-- SOLO BRANCH -->
     <select name="filter1" onchange="this.form.submit()">
       <option value="">BRANCH</option>
       {% for f in filters1 %}
-        <option value="{{ f }}" {% if f==selected_filter1 %}selected{% endif %}>{{ f }}</option>
+        <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
+      {% endfor %}
+    </select>
+
+  {% elif is_branch_tab %}
+    <!-- BRANCH + CONTRATA -->
+    <select name="filter1" onchange="this.form.submit()">
+      <option value="">BRANCH</option>
+      {% for f in filters1 %}
+        <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
       {% endfor %}
     </select>
 
     <select name="filter2" onchange="this.form.submit()">
       <option value="">CONTRATA</option>
       {% for f in filters2 %}
-        <option value="{{ f }}" {% if f==selected_filter2 %}selected{% endif %}>{{ f }}</option>
+        <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
       {% endfor %}
     </select>
+
   {% else %}
+    <!-- SITE + REPORTE CONTRATA -->
     <select name="filter1" onchange="this.form.submit()">
       <option value="">SITE</option>
       {% for f in filters1 %}
-        <option value="{{ f }}" {% if f==selected_filter1 %}selected{% endif %}>{{ f }}</option>
+        <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
       {% endfor %}
     </select>
 
     <select name="filter2" onchange="this.form.submit()">
       <option value="">REPORTE CONTRATA</option>
       {% for f in filters2 %}
-        <option value="{{ f }}" {% if f==selected_filter2 %}selected{% endif %}>{{ f }}</option>
+        <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
       {% endfor %}
     </select>
   {% endif %}
@@ -136,9 +148,6 @@ function initMap() {
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
   }
 
-  // =========================
-  // 🟦 COBERTURA KML
-  // =========================
   if (!coberturaLayer) {
     coberturaLayer = omnivore.kml(
       "/static/cobertura.kml",
@@ -158,9 +167,6 @@ function initMap() {
     .addTo(map);
   }
 
-  // =========================
-  // 📍 PINES
-  // =========================
   const coordsInfo = {{ coords_info | tojson }};
   if (!coordsInfo.length) return;
 
@@ -185,10 +191,7 @@ function initMap() {
       <b>Estado de la caja:</b> ${p.status || "—"}
     `;
 
-    L.marker([p.lat, p.lng], { icon })
-      .addTo(map)
-      .bindPopup(popup);
-
+    L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup);
     bounds.push([p.lat, p.lng]);
   });
 
