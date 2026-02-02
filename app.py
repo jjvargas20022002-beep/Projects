@@ -72,7 +72,9 @@ def find_col_exact(headers, expected_name):
     return None
 
 
-# 🔑 CAJAS REPARADAS DESDE PENDIENTES ODN
+# =====================
+# CAJAS REPARADAS DESDE PENDIENTES ODN
+# =====================
 def get_repaired_boxes():
     try:
         ws = sheet.worksheet("PENDIENTES ODN")
@@ -176,7 +178,9 @@ def index():
     if selected_tab == "GARANTIAS LIMA":
         repaired_boxes = get_repaired_boxes()
 
-    # ===== COORDENADAS =====
+    # =====================
+    # COORDENADAS
+    # =====================
     coords_info = []
     if coord_idx is not None:
         for r in filtered_rows:
@@ -185,8 +189,16 @@ def index():
                 caja_val = r[caja_idx] if caja_idx is not None else ""
 
                 estado_caja = ""
+
                 if selected_tab == "GARANTIAS LIMA":
                     estado_caja = "Reparado" if caja_val in repaired_boxes else ""
+
+                elif selected_tab in [
+                    "GARANTIAS PROVINCIA",
+                    "FUERA DE GARANTÍA PROVINCIA",
+                ]:
+                    estado_caja = ""  # 🔕 ocultar estado
+
                 else:
                     estado_caja = r[status_idx] if status_idx is not None else ""
 
@@ -200,6 +212,9 @@ def index():
             except:
                 pass
 
+    # =====================
+    # COLUMNAS VISIBLES
+    # =====================
     hidden_idxs = set()
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
