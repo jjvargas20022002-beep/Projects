@@ -60,15 +60,12 @@
             body {
                 padding:12px;
             }
-
             .filters {
                 flex-direction: column;
             }
-
             select, button {
                 width: 100%;
             }
-
             #map {
                 height:280px;
             }
@@ -102,9 +99,7 @@
         <select name="filter1" onchange="this.form.submit()">
             <option value="">BRANCH</option>
             {% for f in filters1 %}
-                <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>
-                    {{ f }}
-                </option>
+                <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
             {% endfor %}
         </select>
 
@@ -112,18 +107,14 @@
         <select name="filter1" onchange="this.form.submit()">
             <option value="">BRANCH</option>
             {% for f in filters1 %}
-                <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>
-                    {{ f }}
-                </option>
+                <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
             {% endfor %}
         </select>
 
         <select name="filter2" onchange="this.form.submit()">
             <option value="">CONTRATA</option>
             {% for f in filters2 %}
-                <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>
-                    {{ f }}
-                </option>
+                <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
             {% endfor %}
         </select>
 
@@ -131,18 +122,14 @@
         <select name="filter1" onchange="this.form.submit()">
             <option value="">SITE</option>
             {% for f in filters1 %}
-                <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>
-                    {{ f }}
-                </option>
+                <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
             {% endfor %}
         </select>
 
         <select name="filter2" onchange="this.form.submit()">
             <option value="">REPORTE CONTRATA</option>
             {% for f in filters2 %}
-                <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>
-                    {{ f }}
-                </option>
+                <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
             {% endfor %}
         </select>
     {% endif %}
@@ -156,7 +143,6 @@
     <div id="map"></div>
 </div>
 
-<!-- 📱 SCROLL HORIZONTAL EN MÓVIL -->
 <div style="overflow-x:auto;">
 <table>
     <thead>
@@ -249,11 +235,14 @@ function initMap() {
             .map(x => x.cuenta)
             .filter(Boolean);
 
-        const popup = `
+        let popup = `
             <b>CAJA:</b> ${p.caja}<br>
             <b>CLIENTES:</b> ${clientes.join(", ")}<br>
-            <b>Estado de la caja:</b> ${p.status || "—"}
         `;
+
+        {% if selected_tab not in ["GARANTIAS PROVINCIA", "FUERA DE GARANTÍA PROVINCIA"] %}
+            popup += `<b>Estado de la caja:</b> ${p.status || "—"}`;
+        {% endif %}
 
         L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup);
         bounds.push([p.lat, p.lng]);
