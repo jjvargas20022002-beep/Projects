@@ -72,6 +72,32 @@ def find_col_exact(headers, expected_name):
     return None
 
 
+# 🔑 CAJAS REPARADAS DESDE PENDIENTES ODN
+def get_repaired_boxes():
+    try:
+        ws = sheet.worksheet("PENDIENTES ODN")
+        data = ws.get_all_values()
+        headers = data[0]
+        rows = data[1:]
+
+        caja_idx = find_col_exact(headers, "CAJA")
+        status_idx = find_col(headers, "STATUS DE LA CAJA")
+
+        repaired = set()
+        for r in rows:
+            if (
+                caja_idx is not None
+                and status_idx is not None
+                and len(r) > max(caja_idx, status_idx)
+                and r[status_idx].strip().lower() == "reparado"
+            ):
+                repaired.add(r[caja_idx].strip())
+
+        return repaired
+    except:
+        return set()
+
+
 # =====================
 # ROUTE
 # =====================
@@ -95,13 +121,11 @@ def index():
     rows_all = data[1:]
     total_rows = len(rows_all)
 
-    # ===== columnas comunes =====
     coord_idx = find_col(headers, "COORDENADAS")
     caja_idx = find_col_exact(headers, "CAJA")
     cuenta_idx = find_col(headers, "CUENTA")
     status_idx = find_col(headers, "STATUS DE LA CAJA")
 
-    # ===== definición de filtros por TAB =====
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
         use_filter2 = True
@@ -115,7 +139,6 @@ def index():
     col1_idx = find_col(headers, col1_name)
     col2_idx = find_col(headers, col2_name) if col2_name else None
 
-    # ===== FILTRO 1 =====
     if col1_idx is not None and selected_filter1:
         rows_after_f1 = [
             r for r in rows_all
@@ -124,7 +147,6 @@ def index():
     else:
         rows_after_f1 = rows_all
 
-    # ===== FILTRO 2 =====
     if use_filter2 and col2_idx is not None and selected_filter2:
         filtered_rows = [
             r for r in rows_after_f1
@@ -133,7 +155,6 @@ def index():
     else:
         filtered_rows = rows_after_f1
 
-    # ===== opciones de filtros =====
     filters1 = sorted({
         r[col1_idx]
         for r in filtered_rows
@@ -150,42 +171,47 @@ def index():
 
     filtered_count = len(filtered_rows)
 
-    # ===== coordenadas =====
+    # 🔑 CAJAS REPARADAS SOLO PARA GARANTIAS LIMA
+    repaired_boxes = set()
+    if selected_tab == "GARANTIAS LIMA":
+        repaired_boxes = get_repaired_boxes()
+
+    # ===== COORDENADAS =====
     coords_info = []
     if coord_idx is not None:
         for r in filtered_rows:
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
+                caja_val = r[caja_idx] if caja_idx is not None else ""
+
+                estado_caja = ""
+                if selected_tab == "GARANTIAS LIMA":
+                    estado_caja = "Reparado" if caja_val in repaired_boxes else ""
+                else:
+                    estado_caja = r[status_idx] if status_idx is not None else ""
+
                 coords_info.append({
                     "lat": lat,
                     "lng": lng,
-                    "caja": r[caja_idx] if caja_idx is not None else "",
+                    "caja": caja_val,
                     "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
-                    "status": r[status_idx] if status_idx is not None else "",
+                    "status": estado_caja,
                 })
             except:
                 pass
 
-    # ===== ocultar columnas =====
     hidden_idxs = set()
-
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
-
     if selected_tab == "PENDIENTES ODN" and caja_idx is not None:
         hidden_idxs.add(caja_idx)
-
     hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
 
-    visible_headers = [
-        h for i, h in enumerate(headers) if i not in hidden_idxs
-    ]
+    visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
 
     rows_with_links = []
     for r in filtered_rows:
-        visible_row = [
-            c for i, c in enumerate(r) if i not in hidden_idxs
-        ]
+        visible_row = [c for i, c in enumerate(r) if i not in hidden_idxs]
         link = coord_to_link(r[coord_idx]) if coord_idx is not None else None
         rows_with_links.append((visible_row, link))
 
