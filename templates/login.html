@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Login WO Pendientes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background:#0f172a;
+            color:#e5e7eb;
+            font-family:Arial;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            height:100vh;
+        }
+        form {
+            background:#020617;
+            padding:25px;
+            border-radius:8px;
+            width:100%;
+            max-width:320px;
+        }
+        input, button {
+            width:100%;
+            padding:10px;
+            margin-top:10px;
+            background:#020617;
+            color:#e5e7eb;
+            border:1px solid #334155;
+        }
+        button {
+            background:#2563eb;
+            border:none;
+            cursor:pointer;
+        }
+        .error {
+            color:#f87171;
+            margin-top:10px;
+        }
+    </style>
+</head>
+<body>
+
+<form method="post">
+    <h2>Acceso WO Pendientes</h2>
+
+    <input type="text" name="username" placeholder="Usuario" required>
+    <input type="password" name="password" placeholder="Contraseña" required>
+
+    <button type="submit">Ingresar</button>
+
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+</form>
+
+</body>
+</html>
