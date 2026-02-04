@@ -2,179 +2,239 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Control de Cajas ODN</title>
+    <title>WO Pendientes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Google Maps -->
+    {% if has_coords %}
+    <script src="https://maps.googleapis.com/maps/api/js"></script>
+    {% endif %}
 
     <style>
         body {
-            background-color: #f8f9fa;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: #e5e7eb;
+        }
+
+        header {
+            background: #020617;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h2 {
+            margin: 0;
+        }
+
+        header a {
+            color: #93c5fd;
+            text-decoration: none;
+            margin-left: 15px;
+        }
+
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            background: #020617;
+            padding: 10px;
+            gap: 6px;
+        }
+
+        .tabs a {
+            padding: 6px 12px;
+            background: #1e293b;
+            color: #e5e7eb;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .tabs a.active {
+            background: #2563eb;
+        }
+
+        .filters {
+            padding: 10px;
+            background: #020617;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        select {
+            padding: 6px;
+            background: #020617;
+            color: #e5e7eb;
+            border: 1px solid #334155;
+        }
+
+        .stats {
+            padding: 10px;
+            background: #020617;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            padding: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th, td {
+            border: 1px solid #334155;
+            padding: 6px;
+            text-align: left;
+        }
+
+        th {
+            background: #1e293b;
+        }
+
+        a.map-link {
+            color: #93c5fd;
         }
 
         #map {
-            height: 450px;
-            width: 100%;
-            margin-bottom: 20px;
-            border-radius: 8px;
-        }
-
-        .table-responsive {
-            max-height: 65vh;
-            overflow-y: auto;
-        }
-
-        thead th {
-            position: sticky;
-            top: 0;
-            background-color: #212529;
-            color: white;
-            z-index: 2;
-        }
-
-        .badge {
-            font-size: 0.9rem;
+            height: 400px;
+            margin: 10px;
+            border-radius: 6px;
         }
     </style>
 </head>
-
 <body>
 
-<div class="container-fluid mt-3">
-
-    <!-- HEADER -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">📦 Control de Cajas ODN</h4>
-
-        <div>
-            <span class="me-3">👤 {{ user }}</span>
-            <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger">
-                Cerrar sesión
-            </a>
-        </div>
+<header>
+    <h2>WO Pendientes</h2>
+    <div>
+        👤 {{ user }}
+        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
     </div>
+</header>
 
-    <!-- TABS -->
-    <ul class="nav nav-tabs mb-3">
-        {% for tab in tabs %}
-        <li class="nav-item">
-            <a class="nav-link {% if tab == selected_tab %}active{% endif %}"
-               href="/?tab={{ tab }}">
-                {{ tab }}
-            </a>
-        </li>
-        {% endfor %}
-    </ul>
-
-    <!-- FILTROS -->
-    <form method="get" class="row g-2 mb-3">
-        <input type="hidden" name="tab" value="{{ selected_tab }}">
-        <input type="hidden" name="last_tab" value="{{ last_tab }}">
-
-        <div class="col-md-3">
-            <select name="filter1" class="form-select" onchange="this.form.submit()">
-                <option value="">-- Filtro principal --</option>
-                {% for f in filters1 %}
-                    <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>
-                        {{ f }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        {% if use_filter2 %}
-        <div class="col-md-3">
-            <select name="filter2" class="form-select" onchange="this.form.submit()">
-                <option value="">-- Segundo filtro --</option>
-                {% for f in filters2 %}
-                    <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>
-                        {{ f }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-    </form>
-
-    <!-- CONTADORES -->
-    <div class="mb-3">
-        <span class="badge bg-secondary me-2">
-            Total registros: {{ total_rows }}
-        </span>
-        <span class="badge bg-primary">
-            Registros filtrados: {{ filtered_count }}
-        </span>
-    </div>
-
-    <!-- MAPA -->
-    {% if has_coords %}
-    <div id="map"></div>
-    {% endif %}
-
-    <!-- TABLA -->
-    <div class="table-responsive">
-        <table class="table table-bordered table-striped table-sm align-middle">
-            <thead>
-                <tr>
-                    {% for h in headers %}
-                        <th>{{ h }}</th>
-                    {% endfor %}
-                    {% if show_map_column %}
-                        <th class="text-center">Mapa</th>
-                    {% endif %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for row, link in rows_with_links %}
-                <tr>
-                    {% for c in row %}
-                        <td>{{ c }}</td>
-                    {% endfor %}
-                    {% if show_map_column %}
-                    <td class="text-center">
-                        {% if link %}
-                            <a href="{{ link }}" target="_blank">📍</a>
-                        {% endif %}
-                    </td>
-                    {% endif %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
+<!-- TABS -->
+<div class="tabs">
+    {% for tab in tabs %}
+        <a
+            href="/?tab={{ tab }}"
+            class="{% if tab == selected_tab %}active{% endif %}"
+        >
+            {{ tab }}
+        </a>
+    {% endfor %}
 </div>
 
-<!-- MAP SCRIPT -->
+<!-- FILTROS -->
+<form method="get" class="filters">
+    <input type="hidden" name="tab" value="{{ selected_tab }}">
+    <input type="hidden" name="last_tab" value="{{ last_tab }}">
+
+    <select name="filter1" onchange="this.form.submit()">
+        <option value="">-- Todos --</option>
+        {% for f in filters1 %}
+            <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>
+                {{ f }}
+            </option>
+        {% endfor %}
+    </select>
+
+    {% if use_filter2 %}
+    <select name="filter2" onchange="this.form.submit()">
+        <option value="">-- Todos --</option>
+        {% for f in filters2 %}
+            <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>
+                {{ f }}
+            </option>
+        {% endfor %}
+    </select>
+    {% endif %}
+</form>
+
+<!-- STATS -->
+<div class="stats">
+    Total registros: <b>{{ total_rows }}</b> |
+    Filtrados: <b>{{ filtered_count }}</b>
+</div>
+
+<!-- MAPA -->
 {% if has_coords %}
+<div id="map"></div>
 <script>
-    const map = L.map('map').setView([-12.05, -77.05], 11);
+    function initMap() {
+        const map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 11,
+            center: { lat: -12.0464, lng: -77.0428 }
+        });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+        const bounds = new google.maps.LatLngBounds();
 
-    const points = {{ coords_info | tojson }};
+        {% for c in coords_info %}
+        const pos = { lat: {{ c.lat }}, lng: {{ c.lng }} };
+        bounds.extend(pos);
 
-    points.forEach(p => {
-        const popup = `
-            <b>Caja:</b> ${p.caja}<br>
-            <b>Cuenta:</b> ${p.cuenta}<br>
-            <b>Estado:</b> ${p.status || '-'}
-        `;
-        L.marker([p.lat, p.lng])
-            .addTo(map)
-            .bindPopup(popup);
-    });
+        const marker = new google.maps.Marker({
+            position: pos,
+            map: map,
+            title: "{{ c.caja }}"
+        });
+
+        const info = new google.maps.InfoWindow({
+            content: `
+                <b>Caja:</b> {{ c.caja }}<br>
+                <b>Cuenta:</b> {{ c.cuenta }}<br>
+                <b>Estado:</b> {{ c.status }}
+            `
+        });
+
+        marker.addListener("click", () => info.open(map, marker));
+        {% endfor %}
+
+        if ({{ coords_info|length }} > 0) {
+            map.fitBounds(bounds);
+        }
+    }
+    initMap();
 </script>
 {% endif %}
 
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- TABLA -->
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                {% for h in headers %}
+                    <th>{{ h }}</th>
+                {% endfor %}
+                {% if show_map_column %}
+                    <th>Mapa</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row, link in rows_with_links %}
+            <tr>
+                {% for c in row %}
+                    <td>{{ c }}</td>
+                {% endfor %}
+                {% if show_map_column %}
+                    <td>
+                        {% if link %}
+                            <a class="map-link" href="{{ link }}" target="_blank">Ver</a>
+                        {% endif %}
+                    </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
 </body>
 </html>
