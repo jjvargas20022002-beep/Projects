@@ -42,7 +42,6 @@ BRANCH_TABS = [
 
 SINGLE_BRANCH_TAB = "ONLINE LIMA"
 
-# 🔑 Tabs que usan estado desde PENDIENTES ODN
 STATUS_FROM_ODN_TABS = [
     "GARANTIAS LIMA",
     "LI1 TGI",
@@ -85,7 +84,7 @@ def find_col_exact(headers, expected_name):
 
 
 # =====================
-# ESTADO DE CAJAS DESDE PENDIENTES ODN
+# ESTADO DESDE PENDIENTES ODN
 # =====================
 def get_box_status():
     status_map = {}
@@ -120,6 +119,7 @@ def index():
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
+    # reset filtros al cambiar tab
     if last_tab != selected_tab:
         selected_filter1 = ""
         selected_filter2 = ""
@@ -136,6 +136,9 @@ def index():
     cuenta_idx = find_col(headers, "CUENTA")
     status_idx = find_col(headers, "STATUS DE LA CAJA")
 
+    # =====================
+    # CONFIG DE FILTROS
+    # =====================
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
         use_filter2 = True
@@ -149,21 +152,47 @@ def index():
     col1_idx = find_col(headers, col1_name)
     col2_idx = find_col(headers, col2_name) if col2_name else None
 
-    rows_after_f1 = (
-        [r for r in rows_all if len(r) > col1_idx and r[col1_idx] == selected_filter1]
-        if col1_idx is not None and selected_filter1
-        else rows_all
-    )
+    # =====================
+    # APLICAR FILTROS
+    # =====================
+    if col1_idx is not None and selected_filter1:
+        rows_after_f1 = [
+            r for r in rows_all
+            if len(r) > col1_idx and r[col1_idx] == selected_filter1
+        ]
+    else:
+        rows_after_f1 = rows_all
 
-    filtered_rows = (
-        [r for r in rows_after_f1 if len(r) > col2_idx and r[col2_idx] == selected_filter2]
-        if use_filter2 and col2_idx is not None and selected_filter2
-        else rows_after_f1
-    )
+    if use_filter2 and col2_idx is not None and selected_filter2:
+        filtered_rows = [
+            r for r in rows_after_f1
+            if len(r) > col2_idx and r[col2_idx] == selected_filter2
+        ]
+    else:
+        filtered_rows = rows_after_f1
 
     filtered_count = len(filtered_rows)
 
-    # 🔑 ESTADOS DESDE ODN
+    # =====================
+    # VALORES PARA SELECTS
+    # =====================
+    filters1 = sorted({
+        r[col1_idx]
+        for r in rows_all
+        if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
+    })
+
+    filters2 = []
+    if use_filter2 and col2_idx is not None:
+        filters2 = sorted({
+            r[col2_idx]
+            for r in rows_after_f1
+            if len(r) > col2_idx and r[col2_idx]
+        })
+
+    # =====================
+    # ESTADOS DESDE ODN
+    # =====================
     box_status = get_box_status()
 
     # =====================
@@ -193,7 +222,10 @@ def index():
             except:
                 pass
 
-    hidden_idxs = set(i for i, h in enumerate(headers) if "LINK" in h.upper())
+    # =====================
+    # TABLA
+    # =====================
+    hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
 
@@ -212,6 +244,10 @@ def index():
         last_tab=selected_tab,
         headers=visible_headers,
         rows_with_links=rows_with_links,
+        filters1=filters1,
+        filters2=filters2,
+        selected_filter1=selected_filter1,
+        selected_filter2=selected_filter2,
         total_rows=total_rows,
         filtered_count=filtered_count,
         coords_info=coords_info,
