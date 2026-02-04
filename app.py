@@ -42,6 +42,18 @@ BRANCH_TABS = [
 
 SINGLE_BRANCH_TAB = "ONLINE LIMA"
 
+# 🔑 Tabs que usan estado desde PENDIENTES ODN
+STATUS_FROM_ODN_TABS = [
+    "GARANTIAS LIMA",
+    "LI1 TGI",
+    "LI2 DIJUSA",
+    "LI2 ERAM",
+    "LI3 INTER",
+    "LI4 TGI",
+    "LI4 BROKERS",
+    "LI7 MARCOS",
+]
+
 # =====================
 # UTILS
 # =====================
@@ -76,13 +88,6 @@ def find_col_exact(headers, expected_name):
 # ESTADO DE CAJAS DESDE PENDIENTES ODN
 # =====================
 def get_box_status():
-    """
-    Devuelve:
-    {
-        "CAJA123": "Reparado",
-        "CAJA456": "En Plan"
-    }
-    """
     status_map = {}
     try:
         ws = sheet.worksheet("PENDIENTES ODN")
@@ -94,15 +99,10 @@ def get_box_status():
         status_idx = find_col(headers, "STATUS DE LA CAJA")
 
         for r in rows:
-            if (
-                caja_idx is not None
-                and status_idx is not None
-                and len(r) > max(caja_idx, status_idx)
-            ):
+            if len(r) > max(caja_idx, status_idx):
                 estado = r[status_idx].strip().lower()
                 if estado in ["reparado", "en plan"]:
                     status_map[r[caja_idx].strip()] = estado.title()
-
     except:
         pass
 
@@ -149,25 +149,22 @@ def index():
     col1_idx = find_col(headers, col1_name)
     col2_idx = find_col(headers, col2_name) if col2_name else None
 
-    if col1_idx is not None and selected_filter1:
-        rows_after_f1 = [r for r in rows_all if len(r) > col1_idx and r[col1_idx] == selected_filter1]
-    else:
-        rows_after_f1 = rows_all
+    rows_after_f1 = (
+        [r for r in rows_all if len(r) > col1_idx and r[col1_idx] == selected_filter1]
+        if col1_idx is not None and selected_filter1
+        else rows_all
+    )
 
-    if use_filter2 and col2_idx is not None and selected_filter2:
-        filtered_rows = [r for r in rows_after_f1 if len(r) > col2_idx and r[col2_idx] == selected_filter2]
-    else:
-        filtered_rows = rows_after_f1
-
-    filters1 = sorted({r[col1_idx] for r in filtered_rows if col1_idx is not None and len(r) > col1_idx and r[col1_idx]})
-    filters2 = sorted({r[col2_idx] for r in rows_after_f1 if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx]})
+    filtered_rows = (
+        [r for r in rows_after_f1 if len(r) > col2_idx and r[col2_idx] == selected_filter2]
+        if use_filter2 and col2_idx is not None and selected_filter2
+        else rows_after_f1
+    )
 
     filtered_count = len(filtered_rows)
 
-    # 🔑 estados desde PENDIENTES ODN SOLO para GARANTIAS LIMA
-    box_status = {}
-    if selected_tab == "GARANTIAS LIMA":
-        box_status = get_box_status()
+    # 🔑 ESTADOS DESDE ODN
+    box_status = get_box_status()
 
     # =====================
     # COORDENADAS
@@ -177,31 +174,28 @@ def index():
         for r in filtered_rows:
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
-                caja_val = r[caja_idx] if caja_idx is not None else ""
+                caja = r[caja_idx] if caja_idx is not None else ""
 
-                if selected_tab == "GARANTIAS LIMA":
-                    estado_caja = box_status.get(caja_val, "")
+                if selected_tab in STATUS_FROM_ODN_TABS:
+                    estado = box_status.get(caja, "")
                 elif selected_tab in ["GARANTIAS PROVINCIA", "FUERA DE GARANTÍA PROVINCIA"]:
-                    estado_caja = ""
+                    estado = ""
                 else:
-                    estado_caja = r[status_idx] if status_idx is not None else ""
+                    estado = r[status_idx] if status_idx is not None else ""
 
                 coords_info.append({
                     "lat": lat,
                     "lng": lng,
-                    "caja": caja_val,
+                    "caja": caja,
                     "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
-                    "status": estado_caja,
+                    "status": estado,
                 })
             except:
                 pass
 
-    hidden_idxs = set()
+    hidden_idxs = set(i for i, h in enumerate(headers) if "LINK" in h.upper())
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
-    if selected_tab == "PENDIENTES ODN" and caja_idx is not None:
-        hidden_idxs.add(caja_idx)
-    hidden_idxs |= {i for i, h in enumerate(headers) if "LINK" in h.upper()}
 
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
 
@@ -218,10 +212,6 @@ def index():
         last_tab=selected_tab,
         headers=visible_headers,
         rows_with_links=rows_with_links,
-        filters1=filters1,
-        filters2=filters2,
-        selected_filter1=selected_filter1,
-        selected_filter2=selected_filter2,
         total_rows=total_rows,
         filtered_count=filtered_count,
         coords_info=coords_info,
