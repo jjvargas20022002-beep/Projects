@@ -73,9 +73,17 @@ def find_col_exact(headers, expected_name):
 
 
 # =====================
-# CAJAS REPARADAS DESDE PENDIENTES ODN
+# ESTADO DE CAJAS DESDE PENDIENTES ODN
 # =====================
-def get_repaired_boxes():
+def get_box_status():
+    """
+    Devuelve:
+    {
+        "CAJA123": "Reparado",
+        "CAJA456": "En Plan"
+    }
+    """
+    status_map = {}
     try:
         ws = sheet.worksheet("PENDIENTES ODN")
         data = ws.get_all_values()
@@ -85,19 +93,20 @@ def get_repaired_boxes():
         caja_idx = find_col_exact(headers, "CAJA")
         status_idx = find_col(headers, "STATUS DE LA CAJA")
 
-        repaired = set()
         for r in rows:
             if (
                 caja_idx is not None
                 and status_idx is not None
                 and len(r) > max(caja_idx, status_idx)
-                and r[status_idx].strip().lower() == "reparado"
             ):
-                repaired.add(r[caja_idx].strip())
+                estado = r[status_idx].strip().lower()
+                if estado in ["reparado", "en plan"]:
+                    status_map[r[caja_idx].strip()] = estado.title()
 
-        return repaired
     except:
-        return set()
+        pass
+
+    return status_map
 
 
 # =====================
@@ -111,7 +120,6 @@ def index():
     selected_filter1 = request.args.get("filter1", "")
     selected_filter2 = request.args.get("filter2", "")
 
-    # 🔑 reset filtros al cambiar TAB
     if last_tab != selected_tab:
         selected_filter1 = ""
         selected_filter2 = ""
@@ -142,41 +150,24 @@ def index():
     col2_idx = find_col(headers, col2_name) if col2_name else None
 
     if col1_idx is not None and selected_filter1:
-        rows_after_f1 = [
-            r for r in rows_all
-            if len(r) > col1_idx and r[col1_idx] == selected_filter1
-        ]
+        rows_after_f1 = [r for r in rows_all if len(r) > col1_idx and r[col1_idx] == selected_filter1]
     else:
         rows_after_f1 = rows_all
 
     if use_filter2 and col2_idx is not None and selected_filter2:
-        filtered_rows = [
-            r for r in rows_after_f1
-            if len(r) > col2_idx and r[col2_idx] == selected_filter2
-        ]
+        filtered_rows = [r for r in rows_after_f1 if len(r) > col2_idx and r[col2_idx] == selected_filter2]
     else:
         filtered_rows = rows_after_f1
 
-    filters1 = sorted({
-        r[col1_idx]
-        for r in filtered_rows
-        if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
-    })
-
-    filters2 = []
-    if use_filter2 and col2_idx is not None:
-        filters2 = sorted({
-            r[col2_idx]
-            for r in rows_after_f1
-            if len(r) > col2_idx and r[col2_idx]
-        })
+    filters1 = sorted({r[col1_idx] for r in filtered_rows if col1_idx is not None and len(r) > col1_idx and r[col1_idx]})
+    filters2 = sorted({r[col2_idx] for r in rows_after_f1 if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx]})
 
     filtered_count = len(filtered_rows)
 
-    # 🔑 CAJAS REPARADAS SOLO PARA GARANTIAS LIMA
-    repaired_boxes = set()
+    # 🔑 estados desde PENDIENTES ODN SOLO para GARANTIAS LIMA
+    box_status = {}
     if selected_tab == "GARANTIAS LIMA":
-        repaired_boxes = get_repaired_boxes()
+        box_status = get_box_status()
 
     # =====================
     # COORDENADAS
@@ -188,17 +179,10 @@ def index():
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
                 caja_val = r[caja_idx] if caja_idx is not None else ""
 
-                estado_caja = ""
-
                 if selected_tab == "GARANTIAS LIMA":
-                    estado_caja = "Reparado" if caja_val in repaired_boxes else ""
-
-                elif selected_tab in [
-                    "GARANTIAS PROVINCIA",
-                    "FUERA DE GARANTÍA PROVINCIA",
-                ]:
-                    estado_caja = ""  # 🔕 ocultar estado
-
+                    estado_caja = box_status.get(caja_val, "")
+                elif selected_tab in ["GARANTIAS PROVINCIA", "FUERA DE GARANTÍA PROVINCIA"]:
+                    estado_caja = ""
                 else:
                     estado_caja = r[status_idx] if status_idx is not None else ""
 
@@ -212,9 +196,6 @@ def index():
             except:
                 pass
 
-    # =====================
-    # COLUMNAS VISIBLES
-    # =====================
     hidden_idxs = set()
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
