@@ -1,315 +1,244 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Averías Pendientes FTTH</title>
+from flask import Flask, render_template, request, redirect, url_for, session
+import gspread
+from google.oauth2.service_account import Credentials
+import os
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "secret_key_temporal")
 
-<style>
-body{
-    margin:0;
-    font-family:Arial, Helvetica, sans-serif;
-    background:#f4f6f9;
-    color:#1f2937;
+# =====================
+# GOOGLE SHEETS CONFIG
+# =====================
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+
+creds = Credentials.from_service_account_info(
+    {
+        "type": "service_account",
+        "project_id": os.environ["GCP_PROJECT_ID"],
+        "private_key_id": os.environ["GCP_PRIVATE_KEY_ID"],
+        "private_key": os.environ["GCP_PRIVATE_KEY"].replace("\\n", "\n"),
+        "client_email": os.environ["GCP_CLIENT_EMAIL"],
+        "client_id": os.environ["GCP_CLIENT_ID"],
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": os.environ["GCP_CLIENT_CERT_URL"],
+    },
+    scopes=SCOPES,
+)
+
+gc = gspread.authorize(creds)
+sheet = gc.open_by_key(os.environ["SPREADSHEET_ID"])
+
+# =====================
+# CONFIG
+# =====================
+BRANCH_TABS = [
+    "GARANTIAS LIMA",
+    "GARANTIAS PROVINCIA",
+    "FUERA DE GARANTÍA PROVINCIA",
+    "CANCELADOS",
+    "PENDIENTES ODN",
+]
+
+SINGLE_BRANCH_TAB = "ONLINE LIMA"
+
+STATUS_FROM_ODN_TABS = [
+    "GARANTIAS LIMA",
+    "LI1 TGI",
+    "LI2 DIJUSA",
+    "LI2 ERAM",
+    "LI3 INTER",
+    "LI4 TGI",
+    "LI4 BROKERS",
+    "LI7 MARCOS",
+]
+
+# =====================
+# LOGIN
+# =====================
+USERS = {
+    "vtp76066116": "Fbb@12.2025",
+    "vtp62146884": "Fbb@12.2025",
+    "vtp72925383": "Fbb@02.2026"
 }
 
-/* HEADER */
-.header{
-    background:#ffffff;
-    border-bottom:1px solid #e5e7eb;
-    padding:12px 20px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-}
+# =====================
+# UTILS
+# =====================
+def coord_to_link(value):
+    try:
+        lat, lng = map(float, value.replace(" ", "").split(",", 1))
+        return f"https://www.google.com/maps?q={lat},{lng}"
+    except:
+        return None
 
-.header h1{
-    margin:0;
-    font-size:18px;
-    font-weight:600;
-}
+def normalize(text):
+    return "".join(text.upper().split()) if text else ""
 
-.header-right{
-    display:flex;
-    align-items:center;
-    gap:12px;
-}
+def find_col(headers, expected_name):
+    expected = normalize(expected_name)
+    for i, h in enumerate(headers):
+        if expected in normalize(h):
+            return i
+    return None
 
-.header-right img{
-    height:32px;
-}
+def find_col_exact(headers, expected_name):
+    for i, h in enumerate(headers):
+        if h.strip().upper() == expected_name.upper():
+            return i
+    return None
 
-.logout{
-    background:#ef4444;
-    border:none;
-    color:#fff;
-    padding:6px 10px;
-    border-radius:4px;
-    cursor:pointer;
-}
+# =====================
+# LOGIN ROUTES
+# =====================
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip().lower()
+        password = request.form.get("password", "").strip()
+        if username in USERS and USERS[username] == password:
+            session["user"] = username
+            return redirect(url_for("index"))
+        else:
+            error = "Usuario o contraseña incorrectos"
+    return render_template("login.html", error=error)
 
-/* TABS */
-.tabs{
-    display:flex;
-    gap:6px;
-    padding:10px 20px;
-    background:#ffffff;
-    border-bottom:1px solid #e5e7eb;
-    flex-wrap:wrap;
-}
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
-.tab{
-    padding:6px 12px;
-    border-radius:4px;
-    font-size:13px;
-    cursor:pointer;
-    background:#f1f5f9;
-    color:#2563eb;
-    border:1px solid #e5e7eb;
-}
+# =====================
+# MAIN ROUTE
+# =====================
+@app.route("/")
+def index():
+    if "user" not in session:
+        return redirect(url_for("login"))
 
-.tab.active{
-    background:#ffffff;
-    color:#111827;
-    border-bottom:2px solid #2563eb;
-    font-weight:600;
-}
+    tabs = [ws.title for ws in sheet.worksheets()]
+    selected_tab = request.args.get("tab", tabs[0])
+    last_tab = request.args.get("last_tab", "")
+    selected_filter1 = request.args.get("filter1", "").strip()
+    selected_filter2 = request.args.get("filter2", "").strip()
 
-/* CONTENT */
-.container{
-    padding:20px;
-}
+    # reset filtros al cambiar tab
+    if last_tab != selected_tab:
+        selected_filter1 = ""
+        selected_filter2 = ""
 
-.stats{
-    margin-bottom:10px;
-    font-size:13px;
-}
+    ws = sheet.worksheet(selected_tab)
+    data = ws.get_all_values()
+    headers = data[0]
+    rows_all = data[1:]
+    total_rows = len(rows_all)
 
-/* FILTERS */
-.filters{
-    display:flex;
-    gap:10px;
-    margin-bottom:15px;
-    flex-wrap:wrap;
-}
+    coord_idx = find_col(headers, "COORDENADAS")
+    caja_idx = find_col_exact(headers, "CAJA")
+    cuenta_idx = find_col(headers, "CUENTA")
+    status_idx = find_col(headers, "STATUS")
 
-select, button{
-    padding:6px 10px;
-    border-radius:4px;
-    border:1px solid #d1d5db;
-    background:#ffffff;
-    font-size:13px;
-    cursor:pointer;
-}
+    # configurar filtros según tab
+    if selected_tab in BRANCH_TABS:
+        col1_name, col2_name = "BRANCH", "CONTRATA"
+        use_filter2 = True
+    elif selected_tab == SINGLE_BRANCH_TAB:
+        col1_name, col2_name = "BRANCH", None
+        use_filter2 = False
+    else:
+        col1_name, col2_name = "SITE", "REPORTE CONTRATA"
+        use_filter2 = True
 
-/* MAP */
-#map-container{
-    display:block; /* mapa siempre visible */
-    margin-bottom:15px;
-}
+    col1_idx = find_col(headers, col1_name)
+    col2_idx = find_col(headers, col2_name) if col2_name else None
 
-#map{
-    height:400px;
-    border-radius:6px;
-}
+    # =====================
+    # APLICAR FILTROS
+    # =====================
+    def matches(cell_value, filter_value):
+        return normalize(cell_value) == normalize(filter_value)
 
-/* TABLE */
-table{
-    width:100%;
-    border-collapse:collapse;
-    font-size:12px;
-    background:#ffffff;
-    table-layout:auto; /* columnas ajustadas al contenido */
-}
+    # Filtrado por el primer filtro
+    rows_after_f1 = [
+        r for r in rows_all
+        if len(r) > col1_idx and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+    ]
 
-th, td{
-    border:1px solid #e5e7eb;
-    padding:6px;
-    white-space:normal; /* permite que el texto haga wrap */
-    word-wrap:break-word;
-    text-align:left;
-}
+    # Filtrado por el segundo filtro (solo si hay selected_filter2)
+    if use_filter2 and col2_idx is not None and selected_filter2:
+        rows_after_f2 = [
+            r for r in rows_after_f1
+            if len(r) > col2_idx and matches(r[col2_idx], selected_filter2)
+        ]
+    else:
+        rows_after_f2 = rows_after_f1
 
-th{
-    background:#f9fafb;
-    font-weight:600;
-}
+    # Este es el único cambio: ahora filtered_rows toma rows_after_f2
+    filtered_rows = rows_after_f2
+    filtered_count = len(filtered_rows)
 
-tr:nth-child(even){
-    background:#f9fafb;
-}
+    # =====================
+    # DROPDOWNS
+    # =====================
+    filters1 = sorted({r[col1_idx] for r in rows_all if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()})
+    filters2 = sorted({r[col2_idx] for r in rows_after_f1 if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip()})
 
-</style>
-</head>
+    # =====================
+    # COORDENADAS PARA MAPA
+    # =====================
+    coords_info = []
+    show_map_column = coord_idx is not None and selected_tab not in ["CANCELADOS", SINGLE_BRANCH_TAB]
 
-<body>
+    if show_map_column:
+        for r in filtered_rows:
+            try:
+                lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
+                coords_info.append({
+                    "lat": lat,
+                    "lng": lng,
+                    "caja": r[caja_idx] if caja_idx is not None else "",
+                    "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
+                    "status": r[status_idx] if status_idx is not None else ""
+                })
+            except:
+                pass
 
-<div class="header">
-    <h1>Averías Pendientes FTTH</h1>
-    <div class="header-right">
-        <img src="{{ url_for('static', filename='bitel.png') }}">
-        <a href="/logout"><button class="logout">Cerrar sesión</button></a>
-    </div>
-</div>
+    # =====================
+    # TABLA
+    # =====================
+    hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
+    if coord_idx is not None:
+        hidden_idxs.add(coord_idx)
 
-<!-- TABS VISUALES -->
-<div class="tabs">
-{% for t in tabs %}
-    <div class="tab {% if t == selected_tab %}active{% endif %}"
-         onclick="changeTab('{{ t }}')">
-        {{ t }}
-    </div>
-{% endfor %}
-</div>
+    visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
 
-<div class="container">
+    rows_with_links = []
+    for r in filtered_rows:
+        visible_row = [c for i, c in enumerate(r) if i not in hidden_idxs]
+        link = coord_to_link(r[coord_idx]) if coord_idx is not None else None
+        rows_with_links.append((visible_row, link))
 
-<div class="stats">
-    Total registros: <b>{{ total_rows }}</b>
-    {% if total_rows != filtered_count %}
-        | Mostrando: <b>{{ filtered_count }}</b>
-    {% endif %}
-</div>
+    return render_template(
+        "index.html",
+        tabs=tabs,
+        selected_tab=selected_tab,
+        last_tab=selected_tab,
+        headers=visible_headers,
+        rows_with_links=rows_with_links,
+        filters1=filters1,
+        filters2=filters2,
+        selected_filter1=selected_filter1,
+        selected_filter2=selected_filter2,
+        total_rows=total_rows,
+        filtered_count=filtered_count,
+        coords_info=coords_info,
+        has_coords=show_map_column,
+        is_branch_tab=selected_tab in BRANCH_TABS or selected_tab == SINGLE_BRANCH_TAB,
+        show_map_column=show_map_column,
+        use_filter2=use_filter2,
+    )
 
-<form method="get" class="filters" id="filterForm">
-<input type="hidden" name="tab" id="tab_select" value="{{ selected_tab }}">
-<input type="hidden" name="last_tab" value="{{ selected_tab }}">
-
-{% if selected_tab == "ONLINE LIMA" %}
-<select name="filter1" onchange="this.form.submit()">
-<option value="">BRANCH</option>
-{% for f in filters1 %}
-<option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
-{% endfor %}
-</select>
-
-{% elif is_branch_tab %}
-<select name="filter1" onchange="this.form.submit()">
-<option value="">BRANCH</option>
-{% for f in filters1 %}
-<option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
-{% endfor %}
-</select>
-
-<select name="filter2" onchange="this.form.submit()">
-<option value="">CONTRATA</option>
-{% for f in filters2 %}
-<option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
-{% endfor %}
-</select>
-
-{% else %}
-<select name="filter1" onchange="this.form.submit()">
-<option value="">SITE</option>
-{% for f in filters1 %}
-<option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
-{% endfor %}
-</select>
-
-<select name="filter2" onchange="this.form.submit()">
-<option value="">REPORTE CONTRATA</option>
-{% for f in filters2 %}
-<option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
-{% endfor %}
-</select>
-{% endif %}
-
-{% if has_coords %}
-<button type="button" onclick="toggleMap()">🗺️ Mapa</button>
-{% endif %}
-</form>
-
-{% if show_map_column %}
-<div id="map-container">
-    <div id="map"></div>
-</div>
-
-<script>
-const ICONS={
-    green:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/green-dot.png",iconSize:[32,32]}),
-    red:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/red-dot.png",iconSize:[32,32]}),
-    yellow:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/yellow-dot.png",iconSize:[32,32]}),
-    blue:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/blue-dot.png",iconSize:[32,32]})
-};
-
-let map;
-let coberturaLayer;
-
-function toggleMap(){
-    const c=document.getElementById("map-container");
-    c.style.display=c.style.display==="none"?"block":"none";
-    if(c.style.display==="block"){setTimeout(()=>map.invalidateSize(),200);}
-}
-
-function initMap(){
-    if(!map){
-        map=L.map("map");
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-
-        // KML de cobertura agregado pero NO centra el mapa
-        coberturaLayer=omnivore.kml("/static/cobertura.kml", null, L.geoJSON(null,{
-            style:{color:"#2563eb",weight:2,fillColor:"#3b82f6",fillOpacity:0.25}
-        })).addTo(map);
-    }
-
-    const coordsInfo={{ coords_info|tojson }};
-    const bounds=[];
-
-    coordsInfo.forEach(p=>{
-        let icon=ICONS.blue;
-        const status=(p.status||"").toLowerCase();
-        if(status.includes("reparado")) icon=ICONS.green;
-        else if(status.includes("no plan")) icon=ICONS.red;
-        else if(status.includes("en plan")) icon=ICONS.yellow;
-
-        L.marker([p.lat,p.lng],{icon})
-        .addTo(map)
-        .bindPopup(`<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${p.cuenta || ""}<br><b>Estado:</b> ${p.status || ""}`);
-        bounds.push([p.lat,p.lng]);
-    });
-
-    // Centrar mapa SOLO en los puntos de coordenadas
-    if(bounds.length){
-        map.fitBounds(bounds, { padding: [50, 50] });
-    }
-}
-initMap();
-</script>
-{% endif %}
-
-<div>
-<table>
-<thead>
-<tr>
-{% for h in headers %}<th>{{ h }}</th>{% endfor %}
-{% if show_map_column %}<th>MAPA</th>{% endif %}
-</tr>
-</thead>
-<tbody>
-{% for row, link in rows_with_links %}
-<tr>
-{% for c in row %}<td>{{ c }}</td>{% endfor %}
-{% if show_map_column %}
-<td>{% if link %}<a href="{{ link }}" target="_blank">📍 Ver mapa</a>{% endif %}</td>
-{% endif %}
-</tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
-
-</div>
-
-<script>
-function changeTab(tab){
-    document.getElementById("tab_select").value=tab;
-    document.getElementById("filterForm").submit();
-}
-</script>
-
-</body>
-</html>
+if __name__ == "__main__":
+    app.run(debug=True)
