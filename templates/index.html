@@ -247,14 +247,14 @@ function initMap(){
         map=L.map("map");
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-        coberturaLayer=omnivore.kml("/static/cobertura.kml",null,L.geoJSON(null,{
+        // Agregar KML de cobertura pero NO centrar en él
+        coberturaLayer=omnivore.kml("/static/cobertura.kml", null, L.geoJSON(null,{
             style:{color:"#2563eb",weight:2,fillColor:"#3b82f6",fillOpacity:0.25}
-        })).on("ready",()=>map.fitBounds(coberturaLayer.getBounds())).addTo(map);
+        })).addTo(map);
     }
 
     const coordsInfo={{ coords_info|tojson }};
     const bounds=[];
-    let latSum=0, lngSum=0;
 
     coordsInfo.forEach(p=>{
         let icon=ICONS.blue;
@@ -267,15 +267,12 @@ function initMap(){
         .addTo(map)
         .bindPopup(`<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${p.cuenta || ""}<br><b>Estado:</b> ${p.status || ""}`);
         bounds.push([p.lat,p.lng]);
-        latSum += p.lat;
-        lngSum += p.lng;
     });
 
-    // Centrar mapa automáticamente en todas las coordenadas visibles
-if(bounds.length){
-    map.fitBounds(bounds, { padding: [50, 50] }); // ajusta el mapa al contenido
-}
-
+    // Centrar mapa SOLO en los puntos de coordenadas
+    if(bounds.length){
+        map.fitBounds(bounds, { padding: [50, 50] });
+    }
 }
 initMap();
 </script>
