@@ -24,13 +24,18 @@
             margin-bottom:10px;
         }
 
-        .top-left {
-            display:flex;
-            align-items:center;
-            gap:12px;
+        .top-left h1 {
+            margin: 0;
         }
 
-        .top-left img {
+        .top-right {
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            gap:6px;
+        }
+
+        .top-right img {
             height:38px;
         }
 
@@ -94,13 +99,15 @@
 
 <div class="top-bar">
     <div class="top-left">
-        <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
-        <h1>WO Pendientes FTTH</h1>
+        <h1>Averías Pendientes FTTH</h1>
     </div>
 
-    <a href="/logout">
-        <button class="logout">Cerrar sesión</button>
-    </a>
+    <div class="top-right">
+        <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
+        <a href="/logout">
+            <button class="logout">Cerrar sesión</button>
+        </a>
+    </div>
 </div>
 
 <p>
@@ -165,7 +172,6 @@
     {% endif %}
 </form>
 
-<!-- MAPA VISIBLE POR DEFECTO -->
 <div id="map-container">
     <div id="map"></div>
 </div>
