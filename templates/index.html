@@ -94,7 +94,6 @@
 
 <div class="top-bar">
     <div class="top-left">
-        <!-- LOGO BITEL -->
         <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
         <h1>WO Pendientes FTTH</h1>
     </div>
@@ -110,9 +109,6 @@
         | Mostrando: <b>{{ filtered_count }}</b>
     {% endif %}
 </p>
-
-<!-- TODO EL RESTO DEL CÓDIGO SE MANTIENE IGUAL -->
-
 
 <form method="get" class="filters">
     <input type="hidden" name="last_tab" id="last_tab" value="{{ selected_tab }}">
@@ -169,7 +165,8 @@
     {% endif %}
 </form>
 
-<div id="map-container" style="display:none">
+<!-- MAPA VISIBLE POR DEFECTO -->
+<div id="map-container">
     <div id="map"></div>
 </div>
 
@@ -218,35 +215,29 @@ let coberturaLayer;
 function toggleMap() {
     const c = document.getElementById("map-container");
     c.style.display = c.style.display === "none" ? "block" : "none";
-
     if (c.style.display === "block") {
-        initMap();
         setTimeout(() => map.invalidateSize(), 200);
     }
 }
 
 function initMap() {
-    if (!map) {
-        map = L.map("map");
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-    }
+    map = L.map("map");
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-    if (!coberturaLayer) {
-        coberturaLayer = omnivore.kml(
-            "/static/cobertura.kml",
-            null,
-            L.geoJSON(null, {
-                style: {
-                    color: "#2563eb",
-                    weight: 2,
-                    fillColor: "#3b82f6",
-                    fillOpacity: 0.25
-                }
-            })
-        ).on("ready", function () {
-            map.fitBounds(coberturaLayer.getBounds());
-        }).addTo(map);
-    }
+    coberturaLayer = omnivore.kml(
+        "/static/cobertura.kml",
+        null,
+        L.geoJSON(null, {
+            style: {
+                color: "#2563eb",
+                weight: 2,
+                fillColor: "#3b82f6",
+                fillOpacity: 0.25
+            }
+        })
+    ).on("ready", function () {
+        map.fitBounds(coberturaLayer.getBounds());
+    }).addTo(map);
 
     const coordsInfo = {{ coords_info | tojson }};
     if (!coordsInfo.length) return;
@@ -261,19 +252,7 @@ function initMap() {
         else if (status.includes("no plan")) icon = ICONS.red;
         else if (status.includes("en plan")) icon = ICONS.yellow;
 
-        const clientes = coordsInfo
-            .filter(x => x.caja === p.caja)
-            .map(x => x.cuenta)
-            .filter(Boolean);
-
-        let popup = `<b>CAJA:</b> ${p.caja}<br>
-                     <b>CLIENTES:</b> ${clientes.join(", ")}<br>`;
-
-        {% if selected_tab not in ["GARANTIAS PROVINCIA", "FUERA DE GARANTÍA PROVINCIA"] %}
-            popup += `<b>Estado de la caja:</b> ${p.status || "—"}`;
-        {% endif %}
-
-        L.marker([p.lat, p.lng], { icon }).addTo(map).bindPopup(popup);
+        L.marker([p.lat, p.lng], { icon }).addTo(map);
         bounds.push([p.lat, p.lng]);
     });
 
@@ -281,6 +260,8 @@ function initMap() {
         map.fitBounds(bounds, { padding:[50,50] });
     }
 }
+
+initMap();
 
 document.getElementById("tab_select").addEventListener("change", e => {
     document.getElementById("last_tab").value = "";

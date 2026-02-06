@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             background: linear-gradient(135deg, #020617, #0f172a);
@@ -76,19 +80,12 @@
             color: #f87171;
             font-size: 14px;
         }
-
-        @media (max-width: 480px) {
-            .login-box {
-                margin: 0 15px;
-            }
-        }
     </style>
 </head>
 <body>
 
 <form method="post" class="login-box">
 
-    <!-- LOGO BITEL -->
     <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
 
     <h2>Acceso WO Pendientes</h2>

@@ -58,11 +58,10 @@ STATUS_FROM_ODN_TABS = [
 # LOGIN CONFIG (SIMPLE)
 # =====================
 USERS = {
-    "VTP76066116": "Fbb@12.2025",
-    "VTP62146884": "Fbb@12.2025",
-    "VTP72925383": "Fbb@02.2026"
+    "vtp76066116": "Fbb@12.2025",
+    "vtp62146884": "Fbb@12.2025",
+    "vtp72925383": "Fbb@02.2026"
 }
-
 # =====================
 # UTILS
 # =====================
@@ -126,8 +125,8 @@ def login():
     error = None
 
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+        username = request.form.get("username", "").strip().lower()
+        password = request.form.get("password", "").strip()
 
         if username in USERS and USERS[username] == password:
             session["user"] = username
@@ -142,6 +141,7 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
 
 
 # =====================
