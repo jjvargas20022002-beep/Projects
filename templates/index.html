@@ -103,13 +103,18 @@ select, button{
     border:1px solid #d1d5db;
     background:#ffffff;
     font-size:13px;
+    cursor:pointer;
 }
 
 /* MAP */
+#map-container{
+    display:none;
+    margin-bottom:15px;
+}
+
 #map{
     height:400px;
     border-radius:6px;
-    margin-bottom:15px;
 }
 
 /* TABLE */
@@ -169,6 +174,7 @@ tr:nth-child(even){
 
 <form method="get" class="filters" id="filterForm">
 <input type="hidden" name="tab" id="tab_select" value="{{ selected_tab }}">
+<input type="hidden" name="last_tab" value="{{ selected_tab }}">
 
 {% if selected_tab == "ONLINE LIMA" %}
 <select name="filter1" onchange="this.form.submit()">
@@ -220,12 +226,15 @@ tr:nth-child(even){
 </div>
 
 <script>
-const ICONS={green:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/green-dot.png",iconSize:[32,32]}),
-red:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/red-dot.png",iconSize:[32,32]}),
-yellow:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/yellow-dot.png",iconSize:[32,32]}),
-blue:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/blue-dot.png",iconSize:[32,32]})};
+const ICONS={
+    green:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/green-dot.png",iconSize:[32,32]}),
+    red:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/red-dot.png",iconSize:[32,32]}),
+    yellow:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/yellow-dot.png",iconSize:[32,32]}),
+    blue:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/blue-dot.png",iconSize:[32,32]})
+};
 
-let map;let coberturaLayer;
+let map;
+let coberturaLayer;
 
 function toggleMap(){
     const c=document.getElementById("map-container");
@@ -234,25 +243,30 @@ function toggleMap(){
 }
 
 function initMap(){
-    map=L.map("map");
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-    coberturaLayer=omnivore.kml("/static/cobertura.kml",null,L.geoJSON(null,{
-        style:{color:"#2563eb",weight:2,fillColor:"#3b82f6",fillOpacity:0.25}
-    })).on("ready",()=>map.fitBounds(coberturaLayer.getBounds())).addTo(map);
+    if(!map){
+        map=L.map("map");
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+        coberturaLayer=omnivore.kml("/static/cobertura.kml",null,L.geoJSON(null,{
+            style:{color:"#2563eb",weight:2,fillColor:"#3b82f6",fillOpacity:0.25}
+        })).on("ready",()=>map.fitBounds(coberturaLayer.getBounds())).addTo(map);
+    }
 
     const coordsInfo={{ coords_info|tojson }};
     const bounds=[];
     coordsInfo.forEach(p=>{
         let icon=ICONS.blue;
         const status=(p.status||"").toLowerCase();
-        if(status.includes("reparado"))icon=ICONS.green;
-        else if(status.includes("no plan"))icon=ICONS.red;
-        else if(status.includes("en plan"))icon=ICONS.yellow;
-        L.marker([p.lat,p.lng],{icon}).addTo(map)
+        if(status.includes("reparado")) icon=ICONS.green;
+        else if(status.includes("no plan")) icon=ICONS.red;
+        else if(status.includes("en plan")) icon=ICONS.yellow;
+
+        L.marker([p.lat,p.lng],{icon})
+        .addTo(map)
         .bindPopup(`<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${p.cuenta || ""}<br><b>Estado:</b> ${p.status || ""}`);
         bounds.push([p.lat,p.lng]);
     });
-    if(bounds.length)map.fitBounds(bounds,{padding:[50,50]});
+
+    if(bounds.length) map.fitBounds(bounds,{padding:[50,50]});
 }
 initMap();
 </script>

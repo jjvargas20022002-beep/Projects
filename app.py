@@ -55,7 +55,7 @@ STATUS_FROM_ODN_TABS = [
 ]
 
 # =====================
-# LOGIN CONFIG
+# LOGIN
 # =====================
 USERS = {
     "vtp76066116": "Fbb@12.2025",
@@ -74,7 +74,7 @@ def coord_to_link(value):
         return None
 
 def normalize(text):
-    return text.strip().upper() if text else ""
+    return "".join(text.upper().split()) if text else ""
 
 def find_col(headers, expected_name):
     expected = normalize(expected_name)
@@ -90,7 +90,7 @@ def find_col_exact(headers, expected_name):
     return None
 
 # =====================
-# LOGIN
+# LOGIN ROUTES
 # =====================
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -111,7 +111,7 @@ def logout():
     return redirect(url_for("login"))
 
 # =====================
-# MAIN
+# MAIN ROUTE
 # =====================
 @app.route("/")
 def index():
@@ -124,6 +124,7 @@ def index():
     selected_filter1 = request.args.get("filter1", "").strip()
     selected_filter2 = request.args.get("filter2", "").strip()
 
+    # reset filtros al cambiar tab
     if last_tab != selected_tab:
         selected_filter1 = ""
         selected_filter2 = ""
@@ -139,6 +140,7 @@ def index():
     cuenta_idx = find_col(headers, "CUENTA")
     status_idx = find_col(headers, "STATUS")
 
+    # configurar filtros según tab
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
         use_filter2 = True
@@ -155,43 +157,26 @@ def index():
     # =====================
     # APLICAR FILTROS
     # =====================
-    def matches_filter(cell_value, filter_value):
+    def matches(cell_value, filter_value):
         return normalize(cell_value) == normalize(filter_value)
 
-    if col1_idx is not None and selected_filter1:
-        rows_after_f1 = [
-            r for r in rows_all
-            if len(r) > col1_idx and matches_filter(r[col1_idx], selected_filter1)
-        ]
-    else:
-        rows_after_f1 = rows_all
+    rows_after_f1 = [
+        r for r in rows_all
+        if len(r) > col1_idx and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+    ]
 
-    if use_filter2 and col2_idx is not None and selected_filter2:
-        filtered_rows = [
-            r for r in rows_after_f1
-            if len(r) > col2_idx and matches_filter(r[col2_idx], selected_filter2)
-        ]
-    else:
-        filtered_rows = rows_after_f1
+    filtered_rows = [
+        r for r in rows_after_f1
+        if not (use_filter2 and col2_idx is not None and selected_filter2) or matches(r[col2_idx], selected_filter2)
+    ]
 
     filtered_count = len(filtered_rows)
 
     # =====================
     # DROPDOWNS
     # =====================
-    filters1 = sorted({
-        r[col1_idx]
-        for r in rows_all
-        if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()
-    })
-
-    filters2 = []
-    if use_filter2 and col2_idx is not None:
-        filters2 = sorted({
-            r[col2_idx]
-            for r in rows_after_f1
-            if len(r) > col2_idx and r[col2_idx].strip()
-        })
+    filters1 = sorted({r[col1_idx] for r in rows_all if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()})
+    filters2 = sorted({r[col2_idx] for r in rows_after_f1 if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip()})
 
     # =====================
     # COORDENADAS PARA MAPA
@@ -213,6 +198,9 @@ def index():
             except:
                 pass
 
+    # =====================
+    # TABLA
+    # =====================
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
