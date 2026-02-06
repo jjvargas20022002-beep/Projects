@@ -58,8 +58,9 @@ STATUS_FROM_ODN_TABS = [
 # LOGIN CONFIG (SIMPLE)
 # =====================
 USERS = {
-    "admin": "1234",
-    "user": "bitel"
+    "VTP76066116": "Fbb@12.2025",
+    "VTP62146884": "Fbb@12.2025",
+    "VTP72925383": "Fbb@02.2026"
 }
 
 # =====================
