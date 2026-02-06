@@ -123,12 +123,15 @@ table{
     border-collapse:collapse;
     font-size:12px;
     background:#ffffff;
+    table-layout:auto; /* columnas ajustadas al contenido */
 }
 
 th, td{
     border:1px solid #e5e7eb;
     padding:6px;
-    white-space:nowrap;
+    white-space:normal; /* permite que el texto haga wrap */
+    word-wrap:break-word;
+    text-align:left;
 }
 
 th{
@@ -247,7 +250,7 @@ function initMap(){
         map=L.map("map");
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-        // Agregar KML de cobertura pero NO centrar en él
+        // KML de cobertura agregado pero NO centra el mapa
         coberturaLayer=omnivore.kml("/static/cobertura.kml", null, L.geoJSON(null,{
             style:{color:"#2563eb",weight:2,fillColor:"#3b82f6",fillOpacity:0.25}
         })).addTo(map);
@@ -278,7 +281,7 @@ initMap();
 </script>
 {% endif %}
 
-<div style="overflow-x:auto">
+<div>
 <table>
 <thead>
 <tr>
