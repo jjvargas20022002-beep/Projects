@@ -124,10 +124,11 @@ def get_box_status():
         status_idx = find_col(headers, "STATUS DE LA CAJA")
 
         for r in rows:
-            if len(r) > max(caja_idx, status_idx):
-                estado = r[status_idx].strip().lower()
-                if estado in ["reparado", "en plan"]:
-                    status_map[r[caja_idx].strip()] = estado.title()
+            if caja_idx is not None and status_idx is not None:
+                if len(r) > max(caja_idx, status_idx):
+                    estado = r[status_idx].strip().lower()
+                    if estado in ["reparado", "en plan"]:
+                        status_map[r[caja_idx].strip()] = estado.title()
     except:
         pass
 
@@ -186,74 +187,34 @@ def index():
     cuenta_idx = find_col(headers, "CUENTA")
     status_idx = find_col(headers, "STATUS DE LA CAJA")
 
-    # =====================
-    # CONFIG DE FILTROS
-    # =====================
-    if selected_tab in BRANCH_TABS:
-        col1_name, col2_name = "BRANCH", "CONTRATA"
-        use_filter2 = True
-    elif selected_tab == SINGLE_BRANCH_TAB:
-        col1_name, col2_name = "BRANCH", None
-        use_filter2 = False
-    else:
-        col1_name, col2_name = "SITE", "REPORTE CONTRATA"
-        use_filter2 = True
+    filtered_rows = rows_all
 
-    col1_idx = find_col(headers, col1_name)
-    col2_idx = find_col(headers, col2_name) if col2_name else None
+    if selected_filter1:
+        filtered_rows = [r for r in filtered_rows if selected_filter1 in r]
+
+    if selected_filter2:
+        filtered_rows = [r for r in filtered_rows if selected_filter2 in r]
 
     # =====================
-    # APLICAR FILTROS
+    # MAP DATA (CRITICAL FIX)
     # =====================
-    if col1_idx is not None and selected_filter1:
-        rows_after_f1 = [
-            r for r in rows_all
-            if len(r) > col1_idx and r[col1_idx] == selected_filter1
-        ]
-    else:
-        rows_after_f1 = rows_all
-
-    if use_filter2 and col2_idx is not None and selected_filter2:
-        filtered_rows = [
-            r for r in rows_after_f1
-            if len(r) > col2_idx and r[col2_idx] == selected_filter2
-        ]
-    else:
-        filtered_rows = rows_after_f1
-
-    filtered_count = len(filtered_rows)
-
-    # =====================
-    # VALORES PARA SELECTS
-    # =====================
-    filters1 = sorted({
-        r[col1_idx] for r in rows_all
-        if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
-    })
-
-    filters2 = []
-    if use_filter2 and col2_idx is not None:
-        filters2 = sorted({
-            r[col2_idx] for r in rows_after_f1
-            if len(r) > col2_idx and r[col2_idx]
-        })
-
-    # =====================
-    # MAP DATA
-    # =====================
-    box_status = get_box_status()
-    map_points = []
+    coords_info = []
 
     for r in filtered_rows:
         if coord_idx is not None and len(r) > coord_idx:
             link = coord_to_link(r[coord_idx])
             if link:
-                map_points.append({
+                coords_info.append({
                     "coord": r[coord_idx],
-                    "row": r,
-                    "caja": r[caja_idx] if caja_idx is not None else "",
-                    "status": box_status.get(r[caja_idx], "") if caja_idx is not None else "",
+                    "link": link,
+                    "caja": r[caja_idx] if caja_idx is not None and len(r) > caja_idx else "",
+                    "cuenta": r[cuenta_idx] if cuenta_idx is not None and len(r) > cuenta_idx else "",
+                    "status": r[status_idx] if status_idx is not None and len(r) > status_idx else "",
                 })
+
+    # 🔴 NUNCA permitir None
+    if coords_info is None:
+        coords_info = []
 
     return render_template(
         "index.html",
@@ -263,13 +224,14 @@ def index():
         headers=headers,
         rows=filtered_rows,
         total_rows=total_rows,
-        filtered_count=filtered_count,
-        filters1=filters1,
-        filters2=filters2,
-        selected_filter1=selected_filter1,
-        selected_filter2=selected_filter2,
-        use_filter2=use_filter2,
-        coord_idx=coord_idx,
-        map_points=map_points,
-        user=session.get("user")
+        filter1=selected_filter1,
+        filter2=selected_filter2,
+        coords_info=coords_info,
+        user=session.get("user"),
     )
+
+# =====================
+# RUN LOCAL
+# =====================
+if __name__ == "__main__":
+    app.run(debug=True)
