@@ -25,7 +25,7 @@
         }
 
         .top-left h1 {
-            margin: 0;
+            margin:0;
         }
 
         .top-right {
@@ -89,13 +89,15 @@
         @media (max-width: 768px) {
             body { padding:12px; }
             .filters { flex-direction: column; }
-            select, button { width: 100%; }
+            select, button { width:100%; }
             #map { height:280px; }
         }
     </style>
 </head>
 
 <body>
+
+{% set show_map = selected_tab not in ["CANCELADOS", "ONLINE LIMA"] %}
 
 <div class="top-bar">
     <div class="top-left">
@@ -104,9 +106,7 @@
 
     <div class="top-right">
         <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
-        <a href="/logout">
-            <button class="logout">Cerrar sesión</button>
-        </a>
+        <a href="/logout"><button class="logout">Cerrar sesión</button></a>
     </div>
 </div>
 
@@ -122,9 +122,7 @@
 
     <select name="tab" id="tab_select">
         {% for t in tabs %}
-            <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>
-                {{ t }}
-            </option>
+            <option value="{{ t }}" {% if t == selected_tab %}selected{% endif %}>{{ t }}</option>
         {% endfor %}
     </select>
 
@@ -167,14 +165,16 @@
         </select>
     {% endif %}
 
-    {% if has_coords %}
+    {% if show_map and has_coords %}
         <button type="button" onclick="toggleMap()">🗺️ Mapa</button>
     {% endif %}
 </form>
 
+{% if show_map and has_coords %}
 <div id="map-container">
     <div id="map"></div>
 </div>
+{% endif %}
 
 <div style="overflow-x:auto;">
     <table>
@@ -195,11 +195,7 @@
                         <td>{{ c }}</td>
                     {% endfor %}
                     {% if show_map_column %}
-                        <td class="map-cell">
-                            {% if link %}
-                                <a href="{{ link }}" target="_blank">📍 Ver mapa</a>
-                            {% endif %}
-                        </td>
+                        <td>{% if link %}<a href="{{ link }}" target="_blank">📍 Ver mapa</a>{% endif %}</td>
                     {% endif %}
                 </tr>
             {% endfor %}
@@ -207,68 +203,33 @@
     </table>
 </div>
 
+{% if show_map and has_coords %}
 <script>
-const ICONS = {
-    green: new L.Icon({ iconUrl:"https://maps.google.com/mapfiles/ms/icons/green-dot.png", iconSize:[32,32]}),
-    red: new L.Icon({ iconUrl:"https://maps.google.com/mapfiles/ms/icons/red-dot.png", iconSize:[32,32]}),
-    yellow: new L.Icon({ iconUrl:"https://maps.google.com/mapfiles/ms/icons/yellow-dot.png", iconSize:[32,32]}),
-    blue: new L.Icon({ iconUrl:"https://maps.google.com/mapfiles/ms/icons/blue-dot.png", iconSize:[32,32]})
-};
-
 let map;
-let coberturaLayer;
 
 function toggleMap() {
     const c = document.getElementById("map-container");
     c.style.display = c.style.display === "none" ? "block" : "none";
-    if (c.style.display === "block") {
-        setTimeout(() => map.invalidateSize(), 200);
-    }
+    if (c.style.display === "block") setTimeout(() => map.invalidateSize(), 200);
 }
 
-function initMap() {
-    map = L.map("map");
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+map = L.map("map");
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-    coberturaLayer = omnivore.kml(
-        "/static/cobertura.kml",
-        null,
-        L.geoJSON(null, {
-            style: {
-                color: "#2563eb",
-                weight: 2,
-                fillColor: "#3b82f6",
-                fillOpacity: 0.25
-            }
-        })
-    ).on("ready", function () {
-        map.fitBounds(coberturaLayer.getBounds());
-    }).addTo(map);
+const coordsInfo = {{ coords_info | tojson }};
+const bounds = [];
 
-    const coordsInfo = {{ coords_info | tojson }};
-    if (!coordsInfo.length) return;
+coordsInfo.forEach(p => {
+    if (!p.lat || !p.lng) return;
+    L.marker([p.lat, p.lng]).addTo(map);
+    bounds.push([p.lat, p.lng]);
+});
 
-    const bounds = [];
+if (bounds.length) map.fitBounds(bounds, { padding:[50,50] });
+</script>
+{% endif %}
 
-    coordsInfo.forEach(p => {
-        let icon = ICONS.blue;
-        const status = (p.status || "").toLowerCase();
-
-        if (status.includes("reparado")) icon = ICONS.green;
-        else if (status.includes("no plan")) icon = ICONS.red;
-        else if (status.includes("en plan")) icon = ICONS.yellow;
-
-        L.marker([p.lat, p.lng], { icon }).addTo(map);
-        bounds.push([p.lat, p.lng]);
-    });
-
-    if (bounds.length) {
-        map.fitBounds(bounds, { padding:[50,50] });
-    }
-}
-
-initMap();
-
+<script>
 document.getElementById("tab_select").addEventListener("change", e => {
     document.getElementById("last_tab").value = "";
     e.target.form.submit();
