@@ -73,10 +73,8 @@ def coord_to_link(value):
     except:
         return None
 
-
 def normalize(text):
-    return text.upper().strip()
-
+    return text.upper().strip() if text else ""
 
 def find_col(headers, expected_name):
     expected = normalize(expected_name)
@@ -85,13 +83,11 @@ def find_col(headers, expected_name):
             return i
     return None
 
-
 def find_col_exact(headers, expected_name):
     for i, h in enumerate(headers):
         if h.strip().upper() == expected_name.upper():
             return i
     return None
-
 
 # =====================
 # LOGIN
@@ -99,25 +95,20 @@ def find_col_exact(headers, expected_name):
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
-
     if request.method == "POST":
         username = request.form.get("username", "").strip().lower()
         password = request.form.get("password", "").strip()
-
         if username in USERS and USERS[username] == password:
             session["user"] = username
             return redirect(url_for("index"))
         else:
             error = "Usuario o contraseña incorrectos"
-
     return render_template("login.html", error=error)
-
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
-
 
 # =====================
 # MAIN
@@ -139,7 +130,6 @@ def index():
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
-
     headers = data[0]
     rows_all = data[1:]
     total_rows = len(rows_all)
@@ -166,28 +156,31 @@ def index():
     # FILTROS NORMALIZADOS
     # =====================
     if col1_idx is not None and selected_filter1:
+        filter1_norm = normalize(selected_filter1)
         rows_after_f1 = [
             r for r in rows_all
-            if len(r) > col1_idx and r[col1_idx].strip().upper() == selected_filter1.upper()
+            if len(r) > col1_idx and normalize(r[col1_idx]) == filter1_norm
         ]
     else:
         rows_after_f1 = rows_all
 
     if use_filter2 and col2_idx is not None and selected_filter2:
+        filter2_norm = normalize(selected_filter2)
         filtered_rows = [
             r for r in rows_after_f1
-            if len(r) > col2_idx and r[col2_idx].strip().upper() == selected_filter2.upper()
+            if len(r) > col2_idx and normalize(r[col2_idx]) == filter2_norm
         ]
     else:
         filtered_rows = rows_after_f1
 
     filtered_count = len(filtered_rows)
 
+    # Dropdowns
     filters1 = sorted({
         r[col1_idx].strip()
         for r in rows_all
         if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()
-    })
+    }, key=lambda x: x.upper())
 
     filters2 = []
     if use_filter2 and col2_idx is not None:
@@ -195,13 +188,12 @@ def index():
             r[col2_idx].strip()
             for r in rows_after_f1
             if len(r) > col2_idx and r[col2_idx].strip()
-        })
+        }, key=lambda x: x.upper())
 
     # =====================
     # COORDENADAS PARA MAPA
     # =====================
     coords_info = []
-    # NO mostrar mapa en CANCELADOS ni ONLINE LIMA
     show_map_column = coord_idx is not None and selected_tab not in ["CANCELADOS", SINGLE_BRANCH_TAB]
 
     if show_map_column:
@@ -249,7 +241,6 @@ def index():
         show_map_column=show_map_column,
         use_filter2=use_filter2,
     )
-
 
 if __name__ == "__main__":
     app.run(debug=True)
