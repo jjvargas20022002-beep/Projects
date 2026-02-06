@@ -74,7 +74,7 @@ def coord_to_link(value):
         return None
 
 def normalize(text):
-    return text.upper().strip() if text else ""
+    return text.strip().upper() if text else ""
 
 def find_col(headers, expected_name):
     expected = normalize(expected_name)
@@ -155,40 +155,43 @@ def index():
     # =====================
     # FILTROS NORMALIZADOS
     # =====================
+    def clean(text):
+        return text.strip().upper() if text else ""
+
     if col1_idx is not None and selected_filter1:
-        filter1_norm = normalize(selected_filter1)
+        filter1_norm = clean(selected_filter1)
         rows_after_f1 = [
             r for r in rows_all
-            if len(r) > col1_idx and normalize(r[col1_idx]) == filter1_norm
+            if len(r) > col1_idx and clean(r[col1_idx]) == filter1_norm
         ]
     else:
         rows_after_f1 = rows_all
 
     if use_filter2 and col2_idx is not None and selected_filter2:
-        filter2_norm = normalize(selected_filter2)
+        filter2_norm = clean(selected_filter2)
         filtered_rows = [
             r for r in rows_after_f1
-            if len(r) > col2_idx and normalize(r[col2_idx]) == filter2_norm
+            if len(r) > col2_idx and clean(r[col2_idx]) == filter2_norm
         ]
     else:
         filtered_rows = rows_after_f1
 
     filtered_count = len(filtered_rows)
 
-    # Dropdowns
+    # Dropdowns limpios
     filters1 = sorted({
-        r[col1_idx].strip()
+        clean(r[col1_idx])
         for r in rows_all
         if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()
-    }, key=lambda x: x.upper())
+    })
 
     filters2 = []
     if use_filter2 and col2_idx is not None:
         filters2 = sorted({
-            r[col2_idx].strip()
+            clean(r[col2_idx])
             for r in rows_after_f1
             if len(r) > col2_idx and r[col2_idx].strip()
-        }, key=lambda x: x.upper())
+        })
 
     # =====================
     # COORDENADAS PARA MAPA
