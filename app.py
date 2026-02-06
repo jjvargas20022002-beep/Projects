@@ -5,6 +5,9 @@ from werkzeug.security import check_password_hash
 from functools import wraps
 import os
 
+# =====================
+# APP CONFIG
+# =====================
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "super-secret-key")
 
@@ -35,24 +38,24 @@ def login_required(f):
 # =====================
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
-creds = Credentials.from_service_account_info(
-    {
-        "type": "service_account",
-        "project_id": os.environ["GCP_PROJECT_ID"],
-        "private_key_id": os.environ["GCP_PRIVATE_KEY_ID"],
-        "private_key": os.environ["GCP_PRIVATE_KEY"].replace("\\n", "\n"),
-        "client_email": os.environ["GCP_CLIENT_EMAIL"],
-        "client_id": os.environ["GCP_CLIENT_ID"],
-        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-        "token_uri": "https://oauth2.googleapis.com/token",
-        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": os.environ["GCP_CLIENT_CERT_URL"],
-    },
-    scopes=SCOPES,
-)
-
-gc = gspread.authorize(creds)
-sheet = gc.open_by_key(os.environ["SPREADSHEET_ID"])
+def get_sheet():
+    creds = Credentials.from_service_account_info(
+        {
+            "type": "service_account",
+            "project_id": os.environ["GCP_PROJECT_ID"],
+            "private_key_id": os.environ["GCP_PRIVATE_KEY_ID"],
+            "private_key": os.environ["GCP_PRIVATE_KEY"].replace("\\n", "\n"),
+            "client_email": os.environ["GCP_CLIENT_EMAIL"],
+            "client_id": os.environ["GCP_CLIENT_ID"],
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": os.environ["GCP_CLIENT_CERT_URL"],
+        },
+        scopes=SCOPES,
+    )
+    gc = gspread.authorize(creds)
+    return gc.open_by_key(os.environ["SPREADSHEET_ID"])
 
 # =====================
 # CONFIG
@@ -110,8 +113,10 @@ def find_col_exact(headers, expected_name):
 def get_box_status():
     status_map = {}
     try:
+        sheet = get_sheet()
         ws = sheet.worksheet("PENDIENTES ODN")
         data = ws.get_all_values()
+
         headers = data[0]
         rows = data[1:]
 
@@ -157,7 +162,9 @@ def logout():
 @app.route("/")
 @login_required
 def index():
+    sheet = get_sheet()
     tabs = [ws.title for ws in sheet.worksheets()]
+
     selected_tab = request.args.get("tab", tabs[0])
     last_tab = request.args.get("last_tab", "")
     selected_filter1 = request.args.get("filter1", "")
@@ -179,6 +186,9 @@ def index():
     cuenta_idx = find_col(headers, "CUENTA")
     status_idx = find_col(headers, "STATUS DE LA CAJA")
 
+    # =====================
+    # CONFIG DE FILTROS
+    # =====================
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
         use_filter2 = True
@@ -192,18 +202,30 @@ def index():
     col1_idx = find_col(headers, col1_name)
     col2_idx = find_col(headers, col2_name) if col2_name else None
 
+    # =====================
+    # APLICAR FILTROS
+    # =====================
     if col1_idx is not None and selected_filter1:
-        rows_after_f1 = [r for r in rows_all if len(r) > col1_idx and r[col1_idx] == selected_filter1]
+        rows_after_f1 = [
+            r for r in rows_all
+            if len(r) > col1_idx and r[col1_idx] == selected_filter1
+        ]
     else:
         rows_after_f1 = rows_all
 
     if use_filter2 and col2_idx is not None and selected_filter2:
-        filtered_rows = [r for r in rows_after_f1 if len(r) > col2_idx and r[col2_idx] == selected_filter2]
+        filtered_rows = [
+            r for r in rows_after_f1
+            if len(r) > col2_idx and r[col2_idx] == selected_filter2
+        ]
     else:
         filtered_rows = rows_after_f1
 
     filtered_count = len(filtered_rows)
 
+    # =====================
+    # VALORES PARA SELECTS
+    # =====================
     filters1 = sorted({
         r[col1_idx] for r in rows_all
         if col1_idx is not None and len(r) > col1_idx and r[col1_idx]
@@ -216,64 +238,38 @@ def index():
             if len(r) > col2_idx and r[col2_idx]
         })
 
+    # =====================
+    # MAP DATA
+    # =====================
     box_status = get_box_status()
+    map_points = []
 
-    coords_info = []
-    if coord_idx is not None:
-        for r in filtered_rows:
-            try:
-                lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
-                caja = r[caja_idx] if caja_idx is not None else ""
-
-                if selected_tab in STATUS_FROM_ODN_TABS:
-                    estado = box_status.get(caja, "")
-                elif selected_tab in ["GARANTIAS PROVINCIA", "FUERA DE GARANTÍA PROVINCIA"]:
-                    estado = ""
-                else:
-                    estado = r[status_idx] if status_idx is not None else ""
-
-                coords_info.append({
-                    "lat": lat,
-                    "lng": lng,
-                    "caja": caja,
-                    "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
-                    "status": estado,
-                })
-            except:
-                pass
-
-    hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
-    if coord_idx is not None:
-        hidden_idxs.add(coord_idx)
-
-    visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
-
-    rows_with_links = []
     for r in filtered_rows:
-        visible_row = [c for i, c in enumerate(r) if i not in hidden_idxs]
-        link = coord_to_link(r[coord_idx]) if coord_idx is not None else None
-        rows_with_links.append((visible_row, link))
+        if coord_idx is not None and len(r) > coord_idx:
+            link = coord_to_link(r[coord_idx])
+            if link:
+                map_points.append({
+                    "coord": r[coord_idx],
+                    "row": r,
+                    "caja": r[caja_idx] if caja_idx is not None else "",
+                    "status": box_status.get(r[caja_idx], "") if caja_idx is not None else "",
+                })
 
     return render_template(
         "index.html",
         tabs=tabs,
         selected_tab=selected_tab,
         last_tab=selected_tab,
-        headers=visible_headers,
-        rows_with_links=rows_with_links,
+        headers=headers,
+        rows=filtered_rows,
+        total_rows=total_rows,
+        filtered_count=filtered_count,
         filters1=filters1,
         filters2=filters2,
         selected_filter1=selected_filter1,
         selected_filter2=selected_filter2,
-        total_rows=total_rows,
-        filtered_count=filtered_count,
-        coords_info=coords_info,
-        has_coords=coord_idx is not None,
-        is_branch_tab=selected_tab in BRANCH_TABS or selected_tab == SINGLE_BRANCH_TAB,
-        show_map_column=coord_idx is not None,
         use_filter2=use_filter2,
-        user=session.get("user"),
+        coord_idx=coord_idx,
+        map_points=map_points,
+        user=session.get("user")
     )
-
-if __name__ == "__main__":
-    app.run(debug=True)
