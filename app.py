@@ -153,34 +153,34 @@ def index():
     col2_idx = find_col(headers, col2_name) if col2_name else None
 
     # =====================
-    # FILTROS NORMALIZADOS
+    # APLICAR FILTROS
     # =====================
-    def clean(text):
-        return text.strip().upper() if text else ""
+    def matches_filter(cell_value, filter_value):
+        return normalize(cell_value) == normalize(filter_value)
 
     if col1_idx is not None and selected_filter1:
-        filter1_norm = clean(selected_filter1)
         rows_after_f1 = [
             r for r in rows_all
-            if len(r) > col1_idx and clean(r[col1_idx]) == filter1_norm
+            if len(r) > col1_idx and matches_filter(r[col1_idx], selected_filter1)
         ]
     else:
         rows_after_f1 = rows_all
 
     if use_filter2 and col2_idx is not None and selected_filter2:
-        filter2_norm = clean(selected_filter2)
         filtered_rows = [
             r for r in rows_after_f1
-            if len(r) > col2_idx and clean(r[col2_idx]) == filter2_norm
+            if len(r) > col2_idx and matches_filter(r[col2_idx], selected_filter2)
         ]
     else:
         filtered_rows = rows_after_f1
 
     filtered_count = len(filtered_rows)
 
-    # Dropdowns limpios
+    # =====================
+    # DROPDOWNS
+    # =====================
     filters1 = sorted({
-        clean(r[col1_idx])
+        r[col1_idx]
         for r in rows_all
         if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()
     })
@@ -188,7 +188,7 @@ def index():
     filters2 = []
     if use_filter2 and col2_idx is not None:
         filters2 = sorted({
-            clean(r[col2_idx])
+            r[col2_idx]
             for r in rows_after_f1
             if len(r) > col2_idx and r[col2_idx].strip()
         })
