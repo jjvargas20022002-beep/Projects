@@ -5,9 +5,6 @@ from werkzeug.security import check_password_hash
 from functools import wraps
 import os
 
-# =====================
-# APP CONFIG
-# =====================
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "super-secret-key")
 
@@ -55,8 +52,6 @@ creds = Credentials.from_service_account_info(
 )
 
 gc = gspread.authorize(creds)
-
-# 🔴 CONEXIÓN REAL A TU SHEET
 sheet = gc.open_by_key(os.environ["SPREADSHEET_ID"])
 
 # =====================
