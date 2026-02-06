@@ -271,12 +271,11 @@ function initMap(){
         lngSum += p.lng;
     });
 
-    // Centrar mapa en promedio de coordenadas
-    if(bounds.length){
-        const avgLat = latSum / bounds.length;
-        const avgLng = lngSum / bounds.length;
-        map.setView([avgLat, avgLng], 13); // zoom fijo, ajustable
-    }
+    // Centrar mapa automáticamente en todas las coordenadas visibles
+if(bounds.length){
+    map.fitBounds(bounds, { padding: [50, 50] }); // ajusta el mapa al contenido
+}
+
 }
 initMap();
 </script>
