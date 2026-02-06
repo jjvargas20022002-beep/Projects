@@ -55,13 +55,14 @@ STATUS_FROM_ODN_TABS = [
 ]
 
 # =====================
-# LOGIN CONFIG (SIMPLE)
+# LOGIN CONFIG
 # =====================
 USERS = {
     "vtp76066116": "Fbb@12.2025",
     "vtp62146884": "Fbb@12.2025",
     "vtp72925383": "Fbb@02.2026"
 }
+
 # =====================
 # UTILS
 # =====================
@@ -74,13 +75,13 @@ def coord_to_link(value):
 
 
 def normalize(text):
-    return text.upper().replace(" ", "").replace("_", "").replace("DE", "")
+    return text.upper().strip()
 
 
 def find_col(headers, expected_name):
     expected = normalize(expected_name)
     for i, h in enumerate(headers):
-        if expected == normalize(h) or expected in normalize(h):
+        if expected in normalize(h):
             return i
     return None
 
@@ -90,31 +91,6 @@ def find_col_exact(headers, expected_name):
         if h.strip().upper() == expected_name.upper():
             return i
     return None
-
-
-# =====================
-# ESTADO DESDE PENDIENTES ODN
-# =====================
-def get_box_status():
-    status_map = {}
-    try:
-        ws = sheet.worksheet("PENDIENTES ODN")
-        data = ws.get_all_values()
-        headers = data[0]
-        rows = data[1:]
-
-        caja_idx = find_col_exact(headers, "CAJA")
-        status_idx = find_col(headers, "STATUS DE LA CAJA")
-
-        for r in rows:
-            if len(r) > max(caja_idx, status_idx):
-                estado = r[status_idx].strip().lower()
-                if estado in ["reparado", "en plan"]:
-                    status_map[r[caja_idx].strip()] = estado.title()
-    except:
-        pass
-
-    return status_map
 
 
 # =====================
@@ -143,9 +119,8 @@ def logout():
     return redirect(url_for("login"))
 
 
-
 # =====================
-# ROUTE
+# MAIN
 # =====================
 @app.route("/")
 def index():
@@ -155,8 +130,8 @@ def index():
     tabs = [ws.title for ws in sheet.worksheets()]
     selected_tab = request.args.get("tab", tabs[0])
     last_tab = request.args.get("last_tab", "")
-    selected_filter1 = request.args.get("filter1", "")
-    selected_filter2 = request.args.get("filter2", "")
+    selected_filter1 = request.args.get("filter1", "").strip()
+    selected_filter2 = request.args.get("filter2", "").strip()
 
     if last_tab != selected_tab:
         selected_filter1 = ""
@@ -172,7 +147,7 @@ def index():
     coord_idx = find_col(headers, "COORDENADAS")
     caja_idx = find_col_exact(headers, "CAJA")
     cuenta_idx = find_col(headers, "CUENTA")
-    status_idx = find_col(headers, "STATUS DE LA CAJA")
+    status_idx = find_col(headers, "STATUS")
 
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
@@ -187,46 +162,56 @@ def index():
     col1_idx = find_col(headers, col1_name)
     col2_idx = find_col(headers, col2_name) if col2_name else None
 
+    # =====================
+    # FILTROS CORREGIDOS
+    # =====================
     if col1_idx is not None and selected_filter1:
-        rows_after_f1 = [r for r in rows_all if len(r) > col1_idx and r[col1_idx] == selected_filter1]
+        rows_after_f1 = [
+            r for r in rows_all
+            if len(r) > col1_idx and r[col1_idx].strip() == selected_filter1
+        ]
     else:
         rows_after_f1 = rows_all
 
     if use_filter2 and col2_idx is not None and selected_filter2:
-        filtered_rows = [r for r in rows_after_f1 if len(r) > col2_idx and r[col2_idx] == selected_filter2]
+        filtered_rows = [
+            r for r in rows_after_f1
+            if len(r) > col2_idx and r[col2_idx].strip() == selected_filter2
+        ]
     else:
         filtered_rows = rows_after_f1
 
     filtered_count = len(filtered_rows)
 
-    filters1 = sorted({r[col1_idx] for r in rows_all if col1_idx is not None and len(r) > col1_idx and r[col1_idx]})
+    filters1 = sorted({
+        r[col1_idx].strip()
+        for r in rows_all
+        if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()
+    })
 
     filters2 = []
     if use_filter2 and col2_idx is not None:
-        filters2 = sorted({r[col2_idx] for r in rows_after_f1 if len(r) > col2_idx and r[col2_idx]})
+        filters2 = sorted({
+            r[col2_idx].strip()
+            for r in rows_after_f1
+            if len(r) > col2_idx and r[col2_idx].strip()
+        })
 
-    box_status = get_box_status()
-
+    # =====================
+    # COORDENADAS
+    # =====================
     coords_info = []
-    if coord_idx is not None:
+    # NO mostrar mapa en CANCELADOS ni ONLINE LIMA
+    show_map_column = coord_idx is not None and selected_tab not in ["CANCELADOS", SINGLE_BRANCH_TAB]
+
+    if show_map_column:
         for r in filtered_rows:
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
-                caja = r[caja_idx] if caja_idx is not None else ""
-
-                if selected_tab in STATUS_FROM_ODN_TABS:
-                    estado = box_status.get(caja, "")
-                elif selected_tab in ["GARANTIAS PROVINCIA", "FUERA DE GARANTÍA PROVINCIA"]:
-                    estado = ""
-                else:
-                    estado = r[status_idx] if status_idx is not None else ""
-
                 coords_info.append({
                     "lat": lat,
                     "lng": lng,
-                    "caja": caja,
-                    "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
-                    "status": estado,
+                    "status": r[status_idx] if status_idx is not None else ""
                 })
             except:
                 pass
@@ -257,9 +242,9 @@ def index():
         total_rows=total_rows,
         filtered_count=filtered_count,
         coords_info=coords_info,
-        has_coords=coord_idx is not None,
+        has_coords=show_map_column,
         is_branch_tab=selected_tab in BRANCH_TABS or selected_tab == SINGLE_BRANCH_TAB,
-        show_map_column=coord_idx is not None,
+        show_map_column=show_map_column,
         use_filter2=use_filter2,
     )
 
