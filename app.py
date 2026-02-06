@@ -163,12 +163,12 @@ def index():
     col2_idx = find_col(headers, col2_name) if col2_name else None
 
     # =====================
-    # FILTROS CORREGIDOS
+    # FILTROS NORMALIZADOS
     # =====================
     if col1_idx is not None and selected_filter1:
         rows_after_f1 = [
             r for r in rows_all
-            if len(r) > col1_idx and r[col1_idx].strip() == selected_filter1
+            if len(r) > col1_idx and r[col1_idx].strip().upper() == selected_filter1.upper()
         ]
     else:
         rows_after_f1 = rows_all
@@ -176,7 +176,7 @@ def index():
     if use_filter2 and col2_idx is not None and selected_filter2:
         filtered_rows = [
             r for r in rows_after_f1
-            if len(r) > col2_idx and r[col2_idx].strip() == selected_filter2
+            if len(r) > col2_idx and r[col2_idx].strip().upper() == selected_filter2.upper()
         ]
     else:
         filtered_rows = rows_after_f1
@@ -198,7 +198,7 @@ def index():
         })
 
     # =====================
-    # COORDENADAS
+    # COORDENADAS PARA MAPA
     # =====================
     coords_info = []
     # NO mostrar mapa en CANCELADOS ni ONLINE LIMA
@@ -211,6 +211,8 @@ def index():
                 coords_info.append({
                     "lat": lat,
                     "lng": lng,
+                    "caja": r[caja_idx] if caja_idx is not None else "",
+                    "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
                     "status": r[status_idx] if status_idx is not None else ""
                 })
             except:
