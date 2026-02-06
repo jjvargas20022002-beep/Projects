@@ -2,7 +2,6 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- 🔑 CLAVE PARA MÓVIL -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Averías Pendientes FTTH</title>
 
@@ -17,55 +16,71 @@
             font-family:Arial;
             padding:20px;
         }
-        .filters {
-            display:flex;
-            gap:12px;
-            flex-wrap:wrap;
-            margin-bottom:15px;
-        }
-        select, button {
-            padding:6px;
-            background:#020617;
-            color:#e5e7eb;
-            border:1px solid #334155;
-        }
-        table {
-            width:100%;
-            border-collapse:collapse;
-            font-size:13px;
-        }
-        th, td {
-            border:1px solid #334155;
-            padding:6px;
-        }
-        th {
-            background:#1e293b;
-        }
-        tr:nth-child(even){
-            background:#020617;
-        }
-        .map-cell {
-            white-space:nowrap;
-        }
-        #map {
-            height:400px;
-            border-radius:8px;
-            margin-bottom:15px;
-        }
+
         .top-bar {
             display:flex;
             justify-content:space-between;
             align-items:center;
             margin-bottom:10px;
         }
+
+        .top-left {
+            display:flex;
+            align-items:center;
+            gap:12px;
+        }
+
+        .top-left img {
+            height:38px;
+        }
+
         .logout {
             background:#dc2626;
             border:none;
             padding:6px 10px;
             cursor:pointer;
+            color:white;
         }
 
-        /* 📱 RESPONSIVE */
+        .filters {
+            display:flex;
+            gap:12px;
+            flex-wrap:wrap;
+            margin-bottom:15px;
+        }
+
+        select, button {
+            padding:6px;
+            background:#020617;
+            color:#e5e7eb;
+            border:1px solid #334155;
+        }
+
+        table {
+            width:100%;
+            border-collapse:collapse;
+            font-size:13px;
+        }
+
+        th, td {
+            border:1px solid #334155;
+            padding:6px;
+        }
+
+        th {
+            background:#1e293b;
+        }
+
+        tr:nth-child(even){
+            background:#020617;
+        }
+
+        #map {
+            height:400px;
+            border-radius:8px;
+            margin-bottom:15px;
+        }
+
         @media (max-width: 768px) {
             body { padding:12px; }
             .filters { flex-direction: column; }
@@ -78,7 +93,12 @@
 <body>
 
 <div class="top-bar">
-    <h1>WO Pendientes FTTH</h1>
+    <div class="top-left">
+        <!-- LOGO BITEL -->
+        <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
+        <h1>WO Pendientes FTTH</h1>
+    </div>
+
     <a href="/logout">
         <button class="logout">Cerrar sesión</button>
     </a>
@@ -90,6 +110,9 @@
         | Mostrando: <b>{{ filtered_count }}</b>
     {% endif %}
 </p>
+
+<!-- TODO EL RESTO DEL CÓDIGO SE MANTIENE IGUAL -->
+
 
 <form method="get" class="filters">
     <input type="hidden" name="last_tab" id="last_tab" value="{{ selected_tab }}">
