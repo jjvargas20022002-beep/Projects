@@ -108,7 +108,7 @@ select, button{
 
 /* MAP */
 #map-container{
-    display:none;
+    display:block; /* mapa siempre visible */
     margin-bottom:15px;
 }
 
@@ -246,6 +246,7 @@ function initMap(){
     if(!map){
         map=L.map("map");
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
         coberturaLayer=omnivore.kml("/static/cobertura.kml",null,L.geoJSON(null,{
             style:{color:"#2563eb",weight:2,fillColor:"#3b82f6",fillOpacity:0.25}
         })).on("ready",()=>map.fitBounds(coberturaLayer.getBounds())).addTo(map);
@@ -253,6 +254,8 @@ function initMap(){
 
     const coordsInfo={{ coords_info|tojson }};
     const bounds=[];
+    let latSum=0, lngSum=0;
+
     coordsInfo.forEach(p=>{
         let icon=ICONS.blue;
         const status=(p.status||"").toLowerCase();
@@ -264,9 +267,16 @@ function initMap(){
         .addTo(map)
         .bindPopup(`<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${p.cuenta || ""}<br><b>Estado:</b> ${p.status || ""}`);
         bounds.push([p.lat,p.lng]);
+        latSum += p.lat;
+        lngSum += p.lng;
     });
 
-    if(bounds.length) map.fitBounds(bounds,{padding:[50,50]});
+    // Centrar mapa en promedio de coordenadas
+    if(bounds.length){
+        const avgLat = latSum / bounds.length;
+        const avgLng = lngSum / bounds.length;
+        map.setView([avgLat, avgLng], 13); // zoom fijo, ajustable
+    }
 }
 initMap();
 </script>
