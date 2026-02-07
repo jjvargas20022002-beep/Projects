@@ -148,11 +148,13 @@ def index():
         col1_name, col2_name = "BRANCH", None
         use_filter2 = False
     else:
-        col1_name, col2_name = "SITE", "REPORTE CONTRATA"
+        col1_name, col2_name = "SITE", "Reporte de Contrata"
         use_filter2 = True
 
     col1_idx = find_col(headers, col1_name)
-    col2_idx = find_col(headers, col2_name) if col2_name else None
+
+    # ⚡ corrección mínima aquí:
+    col2_idx = find_col_exact(headers, col2_name) if col2_name else None
 
     # =====================
     # APLICAR FILTROS
