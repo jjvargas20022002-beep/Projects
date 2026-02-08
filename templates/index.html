@@ -271,6 +271,15 @@ function initMap(){
     }
 }
 initMap();
+
+/* 🔹 AGREGADO: centrar mapa al hacer click en CUENTA */
+function focusCuenta(cuenta){
+    const coordsInfo={{ coords_info|tojson }};
+    const found=coordsInfo.find(p=>p.cuenta===cuenta);
+    if(found){
+        map.setView([found.lat, found.lng],18);
+    }
+}
 </script>
 {% endif %}
 
@@ -285,7 +294,17 @@ initMap();
 <tbody>
 {% for row, link in rows_with_links %}
 <tr>
-{% for c in row %}<td>{{ c }}</td>{% endfor %}
+{% for c in row %}
+<td>
+{% if c and c in [p.cuenta for p in coords_info] %}
+<a href="javascript:void(0)" onclick="focusCuenta('{{ c }}')" style="color:#2563eb;text-decoration:underline">
+{{ c }}
+</a>
+{% else %}
+{{ c }}
+{% endif %}
+</td>
+{% endfor %}
 {% if show_map_column %}
 <td>{% if link %}<a href="{{ link }}" target="_blank">📍 Ver mapa</a>{% endif %}</td>
 {% endif %}
