@@ -184,6 +184,9 @@ def index():
     def matches(cell_value, filter_value):
         return normalize(cell_value) == normalize(filter_value)
 
+    # =====================
+    # FILTRADO
+    # =====================
     rows_after_f1 = [
         r for r in rows_all
         if len(r) > col1_idx and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
@@ -195,6 +198,24 @@ def index():
         or matches(r[col2_idx], selected_filter2)
     ]
 
+    # =====================
+    # FILTROS (RESTABLECIDOS)
+    # =====================
+    filters1 = sorted({
+        r[col1_idx]
+        for r in rows_all
+        if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()
+    })
+
+    filters2 = sorted({
+        r[col2_idx]
+        for r in rows_after_f1
+        if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip()
+    })
+
+    # =====================
+    # MAPA
+    # =====================
     coords_info = []
     show_map_column = coord_idx is not None and selected_tab not in ["CANCELADOS", SINGLE_BRANCH_TAB]
 
@@ -219,6 +240,9 @@ def index():
             except:
                 pass
 
+    # =====================
+    # TABLA
+    # =====================
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
@@ -238,8 +262,8 @@ def index():
         last_tab=selected_tab,
         headers=visible_headers,
         rows_with_links=rows_with_links,
-        filters1=[],
-        filters2=[],
+        filters1=filters1,
+        filters2=filters2,
         selected_filter1=selected_filter1,
         selected_filter2=selected_filter2,
         total_rows=total_rows,
