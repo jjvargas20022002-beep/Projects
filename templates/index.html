@@ -296,7 +296,7 @@ function focusCuenta(cuenta){
 <tr>
 {% for c in row %}
 <td>
-{% if c and c in [p.cuenta for p in coords_info] %}
+{% if c and c in (coords_info | map(attribute='cuenta') | list) %}
 <a href="javascript:void(0)" onclick="focusCuenta('{{ c }}')" style="color:#2563eb;text-decoration:underline">
 {{ c }}
 </a>
