@@ -143,20 +143,11 @@ tr:nth-child(even){
     background:#f9fafb;
 }
 
-/* ===== FIX MOVIL (AGREGADO) ===== */
+/* ===== FIX MOVIL (SOLO SCROLL HORIZONTAL TABLA) ===== */
 .table-scroll{
     width:100%;
     overflow-x:auto;
     -webkit-overflow-scrolling:touch;
-}
-
-@media (max-width:768px){
-    #map-container{
-        position:sticky;
-        top:0;
-        z-index:1000;
-        background:#f4f6f9;
-    }
 }
 </style>
 </head>
@@ -283,7 +274,6 @@ initMap();
 </script>
 {% endif %}
 
-<!-- TABLA (ENVUELTA, NO MODIFICADA) -->
 <div class="table-scroll">
 <table>
 <thead>
