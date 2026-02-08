@@ -121,6 +121,56 @@ def find_col_exact(headers, expected_name):
             return i
     return None
 
+# ======================================================
+# FUNCIÓN COMPARTIDA PARA FILTROS (AGREGADA)
+# ======================================================
+def get_filtered_data(selected_tab, selected_filter1="", selected_filter2=""):
+    ws = sheet.worksheet(selected_tab)
+    data = ws.get_all_values()
+    headers = data[0]
+    rows_all = data[1:]
+
+    coord_idx = find_col(headers, "COORDENADAS")
+
+    if selected_tab in BRANCH_TABS:
+        col1_name, col2_name = "BRANCH", "CONTRATA"
+        use_filter2 = True
+    elif selected_tab == SINGLE_BRANCH_TAB:
+        col1_name, col2_name = "BRANCH", None
+        use_filter2 = False
+    else:
+        col1_name, col2_name = "SITE", "Reporte de Contrata"
+        use_filter2 = True
+
+    col1_idx = find_col(headers, col1_name)
+    col2_idx = find_col_exact(headers, col2_name) if col2_name else None
+
+    def matches(cell_value, filter_value):
+        return normalize(cell_value) == normalize(filter_value)
+
+    rows_after_f1 = [
+        r for r in rows_all
+        if len(r) > col1_idx and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+    ]
+
+    filtered_rows = [
+        r for r in rows_after_f1
+        if not (use_filter2 and col2_idx is not None and selected_filter2)
+        or matches(r[col2_idx], selected_filter2)
+    ]
+
+    hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
+    if coord_idx is not None:
+        hidden_idxs.add(coord_idx)
+
+    visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
+    visible_rows = [
+        [c for i, c in enumerate(r) if i not in hidden_idxs]
+        for r in filtered_rows
+    ]
+
+    return visible_headers, visible_rows
+
 # =====================
 # LOGIN ROUTES
 # =====================
@@ -266,8 +316,39 @@ def index():
         estado_cajas=estado_cajas,
     )
 
+# ======================================================
+# EXPORT EXCEL NUEVO (AGREGADO)
+# ======================================================
+@app.route("/export_excel")
+def export_excel():
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    tab = request.args.get("tab")
+    filter1 = request.args.get("filter1", "")
+    filter2 = request.args.get("filter2", "")
+
+    headers, rows = get_filtered_data(tab, filter1, filter2)
+
+    df = pd.DataFrame(rows, columns=headers)
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name=tab[:31])
+
+    output.seek(0)
+
+    filename = f"{tab.replace(' ', '_')}.xlsx"
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
 # =====================
-# DOWNLOAD EXCEL
+# DOWNLOAD EXCEL (ORIGINAL - NO TOCADO)
 # =====================
 @app.route("/download_excel")
 def download_excel():

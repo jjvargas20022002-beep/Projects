@@ -222,8 +222,18 @@ tr:nth-child(even){
 </select>
 {% endif %}
 
-<!-- BOTÓN DESCARGA EXCEL -->
-<button type="button" onclick="exportTableToExcel()">Descargar Excel</button>
+<!-- BOTÓN DESCARGA EXCEL (CORRECTO CON FLASK) -->
+<button
+    type="button"
+    onclick="
+        const params = new URLSearchParams(
+            new FormData(document.getElementById('filterForm'))
+        );
+        window.location = '/export_excel?' + params.toString();
+    "
+>
+📥 Descargar Excel
+</button>
 </form>
 
 {% if show_map_column %}
