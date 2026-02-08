@@ -108,7 +108,7 @@ select, button{
 
 /* MAP */
 #map-container{
-    display:block; /* mapa siempre visible */
+    display:block;
     margin-bottom:15px;
 }
 
@@ -123,13 +123,13 @@ table{
     border-collapse:collapse;
     font-size:12px;
     background:#ffffff;
-    table-layout:auto; /* columnas ajustadas al contenido */
+    table-layout:auto;
 }
 
 th, td{
     border:1px solid #e5e7eb;
     padding:6px;
-    white-space:normal; /* permite que el texto haga wrap */
+    white-space:normal;
     word-wrap:break-word;
     text-align:left;
 }
@@ -143,6 +143,21 @@ tr:nth-child(even){
     background:#f9fafb;
 }
 
+/* ===== FIX MOVIL (AGREGADO) ===== */
+.table-scroll{
+    width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+}
+
+@media (max-width:768px){
+    #map-container{
+        position:sticky;
+        top:0;
+        z-index:1000;
+        background:#f4f6f9;
+    }
+}
 </style>
 </head>
 
@@ -156,7 +171,6 @@ tr:nth-child(even){
     </div>
 </div>
 
-<!-- TABS VISUALES -->
 <div class="tabs">
 {% for t in tabs %}
     <div class="tab {% if t == selected_tab %}active{% endif %}"
@@ -211,15 +225,11 @@ tr:nth-child(even){
 </select>
 
 <select name="filter2" onchange="this.form.submit()">
-<option value="">Reporte de Contrata</option>  <!-- CORRECCIÓN AQUI -->
+<option value="">Reporte de Contrata</option>
 {% for f in filters2 %}
 <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
 {% endfor %}
 </select>
-{% endif %}
-
-{% if has_coords %}
-<button type="button" onclick="toggleMap()">🗺️ Mapa</button>
 {% endif %}
 </form>
 
@@ -239,18 +249,11 @@ const ICONS={
 let map;
 let coberturaLayer;
 
-function toggleMap(){
-    const c=document.getElementById("map-container");
-    c.style.display=c.style.display==="none"?"block":"none";
-    if(c.style.display==="block"){setTimeout(()=>map.invalidateSize(),200);}
-}
-
 function initMap(){
     if(!map){
         map=L.map("map");
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-        // KML de cobertura agregado pero NO centra el mapa
         coberturaLayer=omnivore.kml("/static/cobertura.kml", null, L.geoJSON(null,{
             style:{color:"#2563eb",weight:2,fillColor:"#3b82f6",fillOpacity:0.25}
         })).addTo(map);
@@ -272,16 +275,16 @@ function initMap(){
         bounds.push([p.lat,p.lng]);
     });
 
-    // Centrar mapa SOLO en los puntos de coordenadas
     if(bounds.length){
-        map.fitBounds(bounds, { padding: [50, 50] });
+        map.fitBounds(bounds,{padding:[50,50]});
     }
 }
 initMap();
 </script>
 {% endif %}
 
-<div>
+<!-- TABLA (ENVUELTA, NO MODIFICADA) -->
+<div class="table-scroll">
 <table>
 <thead>
 <tr>
