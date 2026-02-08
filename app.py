@@ -122,7 +122,7 @@ def find_col_exact(headers, expected_name):
     return None
 
 # ======================================================
-# FUNCIÓN COMPARTIDA PARA FILTROS (AGREGADA)
+# FUNCIÓN COMPARTIDA PARA FILTROS
 # ======================================================
 def get_filtered_data(selected_tab, selected_filter1="", selected_filter2=""):
     ws = sheet.worksheet(selected_tab)
@@ -317,7 +317,7 @@ def index():
     )
 
 # ======================================================
-# EXPORT EXCEL NUEVO (AGREGADO)
+# EXPORT EXCEL (CORREGIDO – USA XLSXWRITER)
 # ======================================================
 @app.route("/export_excel")
 def export_excel():
@@ -333,7 +333,7 @@ def export_excel():
     df = pd.DataFrame(rows, columns=headers)
 
     output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name=tab[:31])
 
     output.seek(0)
@@ -348,7 +348,7 @@ def export_excel():
     )
 
 # =====================
-# DOWNLOAD EXCEL (ORIGINAL - NO TOCADO)
+# DOWNLOAD EXCEL (ORIGINAL)
 # =====================
 @app.route("/download_excel")
 def download_excel():
