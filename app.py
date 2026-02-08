@@ -31,7 +31,7 @@ gc = gspread.authorize(creds)
 sheet = gc.open_by_key(os.environ["SPREADSHEET_ID"])
 
 # =====================
-# ESTADO DE CAJAS DESDE PENDIENTES ODN  (⬅️ NUEVO)
+# ESTADO DE CAJAS DESDE PENDIENTES ODN
 # =====================
 estado_cajas = {}
 
@@ -47,7 +47,7 @@ try:
     for i, h in enumerate(odn_headers):
         if h.strip().upper() == "CAJA":
             caja_odn_idx = i
-        if "ESTADO" in h.strip().upper():
+        if "STATUS DE LA CAJA" in h.strip().upper():
             estado_odn_idx = i
 
     if caja_odn_idx is not None and estado_odn_idx is not None:
@@ -78,7 +78,7 @@ STATUS_FROM_ODN_TABS = [
     "LI1 TGI",
     "LI2 DIJUSA",
     "LI2 ERAM",
-    "LI3 INTER",
+    "LI4 INTER",
     "LI4 TGI",
     "LI4 BROKERS",
     "LI7 MARCOS",
@@ -167,7 +167,6 @@ def index():
     coord_idx = find_col(headers, "COORDENADAS")
     caja_idx = find_col_exact(headers, "CAJA")
     cuenta_idx = find_col(headers, "CUENTA")
-    status_idx = find_col(headers, "STATUS")
 
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
@@ -196,18 +195,6 @@ def index():
         or matches(r[col2_idx], selected_filter2)
     ]
 
-    filtered_count = len(filtered_rows)
-
-    filters1 = sorted({
-        r[col1_idx] for r in rows_all
-        if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()
-    })
-
-    filters2 = sorted({
-        r[col2_idx] for r in rows_after_f1
-        if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip()
-    })
-
     coords_info = []
     show_map_column = coord_idx is not None and selected_tab not in ["CANCELADOS", SINGLE_BRANCH_TAB]
 
@@ -216,13 +203,19 @@ def index():
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
                 caja = r[caja_idx] if caja_idx is not None else ""
-                coords_info.append({
+
+                punto = {
                     "lat": lat,
                     "lng": lng,
                     "caja": caja,
                     "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
-                    "estado_caja": estado_cajas.get(caja, "")
-                })
+                }
+
+                if selected_tab == "PENDIENTES ODN" or selected_tab in STATUS_FROM_ODN_TABS:
+                    if caja in estado_cajas:
+                        punto["status"] = estado_cajas[caja]
+
+                coords_info.append(punto)
             except:
                 pass
 
@@ -245,12 +238,12 @@ def index():
         last_tab=selected_tab,
         headers=visible_headers,
         rows_with_links=rows_with_links,
-        filters1=filters1,
-        filters2=filters2,
+        filters1=[],
+        filters2=[],
         selected_filter1=selected_filter1,
         selected_filter2=selected_filter2,
         total_rows=total_rows,
-        filtered_count=filtered_count,
+        filtered_count=len(filtered_rows),
         coords_info=coords_info,
         has_coords=show_map_column,
         is_branch_tab=selected_tab in BRANCH_TABS or selected_tab == SINGLE_BRANCH_TAB,

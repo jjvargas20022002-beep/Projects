@@ -286,7 +286,10 @@ function initMap(){
             "LI7 MARCOS"
         ];
 
-        if(tabsConEstado.includes("{{ selected_tab }}") && estadoTexto){
+        if(
+            (tabsConEstado.includes("{{ selected_tab }}") || "{{ selected_tab }}"==="PENDIENTES ODN")
+            && estadoTexto
+        ){
             popupHTML+=`<br><b>Estado de la caja:</b> <span style="color:${estadoColor}">${estadoTexto}</span>`;
         }
 
