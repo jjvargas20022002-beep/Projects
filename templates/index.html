@@ -143,7 +143,6 @@ tr:nth-child(even){
     background:#f9fafb;
 }
 
-/* ===== FIX MOVIL (SOLO SCROLL HORIZONTAL TABLA) ===== */
 .table-scroll{
     width:100%;
     overflow-x:auto;
@@ -256,13 +255,45 @@ function initMap(){
     coordsInfo.forEach(p=>{
         let icon=ICONS.blue;
         const status=(p.status||"").toLowerCase();
-        if(status.includes("reparado")) icon=ICONS.green;
-        else if(status.includes("no plan")) icon=ICONS.red;
-        else if(status.includes("en plan")) icon=ICONS.yellow;
+
+        let estadoTexto="";
+        let estadoColor="";
+
+        if(status.includes("reparado")){
+            icon=ICONS.green;
+            estadoTexto="Reparado";
+            estadoColor="green";
+        }else if(status.includes("no plan")){
+            icon=ICONS.red;
+            estadoTexto="No Plan";
+            estadoColor="red";
+        }else if(status.includes("en plan")){
+            icon=ICONS.yellow;
+            estadoTexto="En Plan";
+            estadoColor="orange";
+        }
+
+        let popupHTML=`<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${p.cuenta || ""}`;
+
+        const tabsConEstado=[
+            "GARANTIAS LIMA",
+            "LI1 TGI",
+            "LI2 DIJUSA",
+            "LI2 ERAM",
+            "LI4 INTER",
+            "LI4 TGI",
+            "LI4 BROKERS",
+            "LI7 MARCOS"
+        ];
+
+        if(tabsConEstado.includes("{{ selected_tab }}") && estadoTexto){
+            popupHTML+=`<br><b>Estado de la caja:</b> <span style="color:${estadoColor}">${estadoTexto}</span>`;
+        }
 
         L.marker([p.lat,p.lng],{icon})
-        .addTo(map)
-        .bindPopup(`<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${p.cuenta || ""}<br><b>Estado:</b> ${p.status || ""}`);
+            .addTo(map)
+            .bindPopup(popupHTML);
+
         bounds.push([p.lat,p.lng]);
     });
 
@@ -272,7 +303,6 @@ function initMap(){
 }
 initMap();
 
-/* 🔹 AGREGADO: centrar mapa al hacer click en CUENTA */
 function focusCuenta(cuenta){
     const coordsInfo={{ coords_info|tojson }};
     const found=coordsInfo.find(p=>p.cuenta===cuenta);

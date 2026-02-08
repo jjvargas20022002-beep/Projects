@@ -31,6 +31,36 @@ gc = gspread.authorize(creds)
 sheet = gc.open_by_key(os.environ["SPREADSHEET_ID"])
 
 # =====================
+# ESTADO DE CAJAS DESDE PENDIENTES ODN  (⬅️ NUEVO)
+# =====================
+estado_cajas = {}
+
+try:
+    ws_odn = sheet.worksheet("PENDIENTES ODN")
+    odn_data = ws_odn.get_all_values()
+    odn_headers = odn_data[0]
+    odn_rows = odn_data[1:]
+
+    caja_odn_idx = None
+    estado_odn_idx = None
+
+    for i, h in enumerate(odn_headers):
+        if h.strip().upper() == "CAJA":
+            caja_odn_idx = i
+        if "ESTADO" in h.strip().upper():
+            estado_odn_idx = i
+
+    if caja_odn_idx is not None and estado_odn_idx is not None:
+        for r in odn_rows:
+            if len(r) > max(caja_odn_idx, estado_odn_idx):
+                caja = r[caja_odn_idx].strip()
+                estado = r[estado_odn_idx].strip()
+                if caja and estado:
+                    estado_cajas[caja] = estado
+except:
+    estado_cajas = {}
+
+# =====================
 # CONFIG
 # =====================
 BRANCH_TABS = [
@@ -124,7 +154,6 @@ def index():
     selected_filter1 = request.args.get("filter1", "").strip()
     selected_filter2 = request.args.get("filter2", "").strip()
 
-    # reset filtros al cambiar tab
     if last_tab != selected_tab:
         selected_filter1 = ""
         selected_filter2 = ""
@@ -140,7 +169,6 @@ def index():
     cuenta_idx = find_col(headers, "CUENTA")
     status_idx = find_col(headers, "STATUS")
 
-    # configurar filtros según tab
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
         use_filter2 = True
@@ -152,13 +180,8 @@ def index():
         use_filter2 = True
 
     col1_idx = find_col(headers, col1_name)
-
-    # ⚡ corrección mínima aquí:
     col2_idx = find_col_exact(headers, col2_name) if col2_name else None
 
-    # =====================
-    # APLICAR FILTROS
-    # =====================
     def matches(cell_value, filter_value):
         return normalize(cell_value) == normalize(filter_value)
 
@@ -169,20 +192,22 @@ def index():
 
     filtered_rows = [
         r for r in rows_after_f1
-        if not (use_filter2 and col2_idx is not None and selected_filter2) or matches(r[col2_idx], selected_filter2)
+        if not (use_filter2 and col2_idx is not None and selected_filter2)
+        or matches(r[col2_idx], selected_filter2)
     ]
 
     filtered_count = len(filtered_rows)
 
-    # =====================
-    # DROPDOWNS
-    # =====================
-    filters1 = sorted({r[col1_idx] for r in rows_all if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()})
-    filters2 = sorted({r[col2_idx] for r in rows_after_f1 if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip()})
+    filters1 = sorted({
+        r[col1_idx] for r in rows_all
+        if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()
+    })
 
-    # =====================
-    # COORDENADAS PARA MAPA
-    # =====================
+    filters2 = sorted({
+        r[col2_idx] for r in rows_after_f1
+        if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip()
+    })
+
     coords_info = []
     show_map_column = coord_idx is not None and selected_tab not in ["CANCELADOS", SINGLE_BRANCH_TAB]
 
@@ -190,19 +215,17 @@ def index():
         for r in filtered_rows:
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
+                caja = r[caja_idx] if caja_idx is not None else ""
                 coords_info.append({
                     "lat": lat,
                     "lng": lng,
-                    "caja": r[caja_idx] if caja_idx is not None else "",
+                    "caja": caja,
                     "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
-                    "status": r[status_idx] if status_idx is not None else ""
+                    "estado_caja": estado_cajas.get(caja, "")
                 })
             except:
                 pass
 
-    # =====================
-    # TABLA
-    # =====================
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
@@ -233,6 +256,7 @@ def index():
         is_branch_tab=selected_tab in BRANCH_TABS or selected_tab == SINGLE_BRANCH_TAB,
         show_map_column=show_map_column,
         use_filter2=use_filter2,
+        estado_cajas=estado_cajas,
     )
 
 if __name__ == "__main__":
