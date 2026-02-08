@@ -221,6 +221,9 @@ tr:nth-child(even){
 {% endfor %}
 </select>
 {% endif %}
+
+<!-- BOTÓN DESCARGA EXCEL -->
+<button type="button" onclick="exportTableToExcel()">Descargar Excel</button>
 </form>
 
 {% if show_map_column %}
@@ -353,6 +356,19 @@ function focusCuenta(cuenta){
 function changeTab(tab){
     document.getElementById("tab_select").value=tab;
     document.getElementById("filterForm").submit();
+}
+
+function exportTableToExcel(){
+    const table=document.querySelector("table");
+    const html=table.outerHTML.replace(/ /g,'%20');
+    const filename='averias_' + '{{ selected_tab }}'.replaceAll(' ','_') + '.xls';
+
+    const a=document.createElement('a');
+    a.href='data:application/vnd.ms-excel,' + html;
+    a.download=filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 </script>
 
