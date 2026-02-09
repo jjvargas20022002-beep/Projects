@@ -17,17 +17,18 @@ html, body {
 }
 
 body {
-    /* 🔥 SOLO CAMBIO DE COLORES */
     background: #0b1220;
     font-family: Arial, Helvetica, sans-serif;
     color: #e5e7eb;
     display: flex;
     justify-content: center;
+    align-items: flex-start;   /* ✅ añadido */
+    min-height: 100vh;         /* ✅ añadido */
 }
 
-/* 🔥 LOGIN (MISMA POSICIÓN QUE ANTES) */
+/* 🔥 LOGIN */
 .login-box {
-    margin-top: 140px; /* 👈 NO TOCADO */
+    margin-top: 12vh;          /* ✅ cambiado (antes 140px) */
     background: #0f172a;
     padding: 30px 25px;
     width: 100%;
