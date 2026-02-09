@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Login WO Pendientes</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 * {
@@ -14,9 +14,10 @@ html, body {
     width: 100%;
     height: 100%;
     margin: 0;
+    padding: 0;
 }
 
-/* 🔥 BODY CENTRADOR (clave) */
+/* 🔥 BODY = CONTENEDOR PRINCIPAL */
 body {
     display: flex;
     justify-content: center;
@@ -24,17 +25,9 @@ body {
     background: linear-gradient(135deg, #020617, #0f172a);
     font-family: Arial, Helvetica, sans-serif;
     color: #e5e7eb;
-    padding: 16px;
 }
 
-/* CONTENEDOR */
-.page {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-}
-
-/* CAJA LOGIN */
+/* 🔥 CAJA LOGIN */
 .login-box {
     background: #020617;
     padding: 30px 25px;
@@ -45,17 +38,20 @@ body {
     text-align: center;
 }
 
+/* LOGO */
 .login-box img {
     width: 120px;
     margin-bottom: 20px;
 }
 
+/* TÍTULO */
 .login-box h2 {
     margin: 0 0 20px;
     font-size: 20px;
     font-weight: 600;
 }
 
+/* INPUTS */
 input {
     width: 100%;
     padding: 12px;
@@ -72,6 +68,7 @@ input:focus {
     border-color: #2563eb;
 }
 
+/* BOTÓN */
 button {
     width: 100%;
     padding: 12px;
@@ -89,6 +86,7 @@ button:hover {
     background: #1d4ed8;
 }
 
+/* ERROR */
 .error {
     margin-top: 15px;
     color: #f87171;
@@ -99,24 +97,22 @@ button:hover {
 
 <body>
 
-<div class="page">
-    <form method="post" class="login-box">
+<form method="post" class="login-box">
 
-        <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
+    <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
 
-        <h2>Acceso WO Pendientes</h2>
+    <h2>Acceso WO Pendientes</h2>
 
-        <input type="text" name="username" placeholder="Usuario" required>
-        <input type="password" name="password" placeholder="Contraseña" required>
+    <input type="text" name="username" placeholder="Usuario" required>
+    <input type="password" name="password" placeholder="Contraseña" required>
 
-        <button type="submit">Ingresar</button>
+    <button type="submit">Ingresar</button>
 
-        {% if error %}
-            <div class="error">{{ error }}</div>
-        {% endif %}
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
 
-    </form>
-</div>
+</form>
 
 </body>
 </html>
