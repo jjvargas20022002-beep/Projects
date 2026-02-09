@@ -10,17 +10,17 @@
     box-sizing: border-box;
 }
 
-/* ❌ ELIMINADO height:100% (rompía webview y web) */
+/* 🔥 FIX WEBVIEW: FONDO TAMBIÉN EN HTML */
 html, body {
     width: 100%;
+    height: 100%;
     margin: 0;
+    background: #e9f3ff;
 }
 
-/* ✅ AHORA EL FONDO OCUPA TODA LA PANTALLA REAL */
+/* ✅ FONDO REAL DE LA PÁGINA */
 body {
-    min-height: 100vh;
-
-    /* 🔵 FONDO AZUL CLARO COMO LA WEB */
+    min-height: 100%;
     background: linear-gradient(
         180deg,
         #e9f3ff 0%,
