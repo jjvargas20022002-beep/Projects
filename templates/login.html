@@ -25,9 +25,9 @@ body {
     min-height: 100vh;
 }
 
-/* 🔥 LOGIN */
+/* LOGIN NORMAL (WEB) */
 .login-box {
-    margin-top: 18vh;
+    margin-top: 14vh;   /* 👈 perfecto para navegador */
     background: #0f172a;
     padding: 30px 25px;
     width: 100%;
@@ -35,6 +35,11 @@ body {
     border-radius: 12px;
     box-shadow: 0 20px 40px rgba(0,0,0,0.6);
     text-align: center;
+}
+
+/* 👇 CUANDO VIENE DESDE LA APP ANDROID */
+body.app-android .login-box {
+    margin-top: 22vh;   /* 👈 MÁS ABAJO SOLO EN LA APP */
 }
 
 /* LOGO */
@@ -92,6 +97,16 @@ button:hover {
     font-size: 14px;
 }
 </style>
+
+<script>
+/* 🔥 DETECTA SI VIENE DESDE LA APP */
+if (window.location.search.includes("app=android")) {
+    document.addEventListener("DOMContentLoaded", function() {
+        document.body.classList.add("app-android");
+    });
+}
+</script>
+
 </head>
 
 <body>
