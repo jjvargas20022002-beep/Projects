@@ -234,6 +234,15 @@ tr:nth-child(even){
 >
 📥 Descargar Excel
 </button>
+
+<!-- 🔍 BUSCADOR -->
+<input
+    type="text"
+    id="tableSearch"
+    placeholder="🔍 Buscar en la tabla..."
+    onkeyup="filterTable()"
+    style="min-width:220px;"
+>
 </form>
 
 {% if show_map_column %}
@@ -368,6 +377,19 @@ function changeTab(tab){
     document.getElementById("filterForm").submit();
 }
 
+/* 🔍 FILTRO EN TIEMPO REAL */
+function filterTable(){
+    const input=document.getElementById("tableSearch");
+    const filter=input.value.toLowerCase();
+    const rows=document.querySelectorAll("tbody tr");
+
+    rows.forEach(row=>{
+        const text=row.innerText.toLowerCase();
+        row.style.display=text.includes(filter) ? "" : "none";
+    });
+}
+
+/* 📥 EXPORTACIÓN A EXCEL (CLIENTE) */
 function exportTableToExcel(){
     const table=document.querySelector("table");
     const html=table.outerHTML.replace(/ /g,'%20');
@@ -381,6 +403,7 @@ function exportTableToExcel(){
     document.body.removeChild(a);
 }
 </script>
+
 
 </body>
 </html>
