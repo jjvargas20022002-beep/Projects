@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Login WO Pendientes</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
 <style>
 * {
@@ -32,11 +32,16 @@ body {
     box-shadow: 0 20px 40px rgba(0,0,0,0.6);
     text-align: center;
 
-    /* 🎯 CENTRADO REAL (no depende de WebView) */
+    /* 🎯 CENTRADO BASE */
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+}
+
+/* 🔥 MAQUILLAJE SOLO ANDROID */
+body.android .login-box {
+    top: calc(50% + 40px); /* 👈 AJUSTA: 30–70px si quieres */
 }
 
 /* LOGO */
@@ -114,6 +119,14 @@ button:hover {
     {% endif %}
 
 </form>
+
+<script>
+    // 🔎 Detectar Android desde el WebView
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("app") === "android") {
+        document.body.classList.add("android");
+    }
+</script>
 
 </body>
 </html>
