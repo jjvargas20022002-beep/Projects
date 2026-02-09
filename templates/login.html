@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Login WO Pendientes</title>
-
-<meta name="viewport"
-content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
 <style>
 *{ box-sizing:border-box; }
@@ -21,11 +19,9 @@ body{
     color:#e5e7eb;
     display:flex;
     justify-content:center;
-    align-items:flex-start;
-    min-height:100vh;
 }
 
-/* LOGIN NORMAL WEB */
+/* 🌐 WEB NORMAL (vh funciona perfecto aquí) */
 .login-box{
     margin-top:12vh;
     background:#020617;
@@ -37,9 +33,9 @@ body{
     text-align:center;
 }
 
-/* 📱 AJUSTE SOLO PARA ANDROID WEBVIEW */
+/* 📱 ANDROID WEBVIEW (usar PIXELES porque vh falla) */
 body.android .login-box{
-    margin-top:20vh;   /* 🔥 MÁS ABAJO SOLO EN APP */
+    margin-top:140px;   /* 🔥 ESTA ES LA CLAVE */
 }
 
 /* LOGO */
@@ -48,14 +44,12 @@ body.android .login-box{
     margin-bottom:20px;
 }
 
-/* TITULO */
 .login-box h2{
     margin:0 0 20px;
     font-size:20px;
     font-weight:600;
 }
 
-/* INPUTS */
 input{
     width:100%;
     padding:12px;
@@ -72,7 +66,6 @@ input:focus{
     border-color:#2563eb;
 }
 
-/* BOTON */
 button{
     width:100%;
     padding:12px;
@@ -98,7 +91,7 @@ button:hover{
 </style>
 
 <script>
-/* 🔥 DETECTA SI VIENE DE LA APP */
+/* Detecta si viene desde la APP */
 if (window.location.search.includes("app=android")) {
     document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.add("android");
@@ -110,7 +103,9 @@ if (window.location.search.includes("app=android")) {
 
 <body>
 <form method="post" class="login-box">
+
 <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
+
 <h2>Acceso WO Pendientes</h2>
 
 <input type="text" name="username" placeholder="Usuario" required>
@@ -121,6 +116,7 @@ if (window.location.search.includes("app=android")) {
 {% if error %}
 <div class="error">{{ error }}</div>
 {% endif %}
+
 </form>
 </body>
 </html>
