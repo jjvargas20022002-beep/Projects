@@ -2,115 +2,116 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Login WO Pendientes</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Login</title>
 
 <style>
+/* ===== RESET TOTAL ===== */
 * {
+    margin: 0;
+    padding: 0;
     box-sizing: border-box;
 }
 
+/* ===== COLORES BASE ===== */
+:root {
+    --bg-main: #0b1220;
+    --card-bg: #0f172a;
+    --input-bg: #020617;
+    --primary: #2563eb;
+    --text-main: #e5e7eb;
+    --text-muted: #94a3b8;
+}
+
+/* ===== TRANSPARENCIA REAL PARA WEBVIEW ===== */
 html, body {
     width: 100%;
     height: 100%;
-    margin: 0;
+    background: transparent;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-body {
-    background: linear-gradient(135deg, #020617, #0f172a);
-    font-family: Arial, Helvetica, sans-serif;
-    color: #e5e7eb;
+/* ===== CONTENEDOR ===== */
+.container {
+    min-height: 100dvh;
     display: flex;
+    align-items: center;
     justify-content: center;
+    background: var(--bg-main);
+    padding: 20px;
 }
 
-/* 🔥 LOGIN BAJADO MANUALMENTE */
-.login-box {
-    margin-top: 140px; /* 👈 AJUSTA AQUÍ (120–180) */
-    background: #020617;
-    padding: 30px 25px;
+/* ===== CARD ===== */
+.card {
     width: 100%;
     max-width: 360px;
-    border-radius: 12px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-    text-align: center;
+    background: var(--card-bg);
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.6);
 }
 
-/* LOGO */
-.login-box img {
-    width: 120px;
+/* ===== LOGO ===== */
+.logo {
+    display: flex;
+    justify-content: center;
     margin-bottom: 20px;
 }
 
-/* TÍTULO */
-.login-box h2 {
-    margin: 0 0 20px;
-    font-size: 20px;
-    font-weight: 600;
+.logo img {
+    width: 140px;
 }
 
-/* INPUTS */
+/* ===== INPUTS ===== */
 input {
     width: 100%;
-    padding: 12px;
-    margin-top: 12px;
-    background: #020617;
-    color: #e5e7eb;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    font-size: 14px;
-}
-
-input:focus {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: none;
     outline: none;
-    border-color: #2563eb;
+    background: var(--input-bg);
+    color: var(--text-main);
+    font-size: 16px;
 }
 
-/* BOTÓN */
+input::placeholder {
+    color: var(--text-muted);
+}
+
+/* ===== BOTÓN ===== */
 button {
     width: 100%;
     padding: 12px;
-    margin-top: 20px;
-    background: #2563eb;
-    color: white;
+    border-radius: 10px;
     border: none;
-    border-radius: 6px;
-    font-size: 15px;
+    background: var(--primary);
+    color: #fff;
     font-weight: 600;
-    cursor: pointer;
+    font-size: 16px;
 }
 
-button:hover {
-    background: #1d4ed8;
-}
-
-/* ERROR */
-.error {
-    margin-top: 15px;
-    color: #f87171;
-    font-size: 14px;
+button:active {
+    opacity: .85;
 }
 </style>
 </head>
 
 <body>
+<div class="container">
+    <div class="card">
 
-<form method="post" class="login-box">
+        <div class="logo">
+            <img src="bitel_logo.png" alt="Bitel">
+        </div>
 
-    <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
+        <input type="text" placeholder="Usuario" autocomplete="username">
+        <input type="password" placeholder="Contraseña" autocomplete="current-password">
 
-    <h2>Acceso WO Pendientes</h2>
+        <button>Ingresar</button>
 
-    <input type="text" name="username" placeholder="Usuario" required>
-    <input type="password" name="password" placeholder="Contraseña" required>
-
-    <button type="submit">Ingresar</button>
-
-    {% if error %}
-        <div class="error">{{ error }}</div>
-    {% endif %}
-
-</form>
-
+    </div>
+</div>
 </body>
 </html>
