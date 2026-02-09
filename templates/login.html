@@ -16,30 +16,27 @@ html, body {
     margin: 0;
 }
 
-/* 🔥 BODY CENTRADO */
+/* BODY NORMAL */
 body {
     background: linear-gradient(135deg, #020617, #0f172a);
     font-family: Arial, Helvetica, sans-serif;
     color: #e5e7eb;
-
-    display: flex;
-    justify-content: center;
-    align-items: center;
 }
 
-/* 🔥 CAJA LOGIN */
+/* 🔥 CENTRADO ABSOLUTO REAL */
 .login-box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
     background: #020617;
     padding: 30px 25px;
-    width: 100%;
+    width: 90%;
     max-width: 360px;
     border-radius: 12px;
     box-shadow: 0 20px 40px rgba(0,0,0,0.6);
     text-align: center;
-
-    /* 🎯 MAQUILLAJE REAL */
-    position: relative;
-    top: 6vh;   /* 👈 AJUSTA AQUÍ SI QUIERES MÁS ABAJO */
 }
 
 /* LOGO */
