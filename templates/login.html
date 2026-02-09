@@ -22,19 +22,17 @@ body {
     color: #e5e7eb;
 }
 
-/* 🔥 CONTENEDOR REAL */
+/* 🔥 CONTENEDOR */
 .page {
-    min-height: 100vh; /* mejor compatibilidad WebView */
+    min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-
-    /* 🔧 Compensación real para Android WebView */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* 🔥 CAJA LOGIN */
+/* 🔴 CAJA LOGIN (PRUEBA VISUAL) */
 .login-box {
     background: #020617;
     padding: 30px 25px;
@@ -44,8 +42,11 @@ body {
     box-shadow: 0 20px 40px rgba(0,0,0,0.6);
     text-align: center;
 
-    /* 👇 ESTO ES LO QUE LO CLAVA AL CENTRO */
+    /* 👇 ajuste WebView */
     transform: translateY(-5%);
+
+    /* 🔴 BORDE ROJO PARA PRUEBA */
+    border: 4px solid red;
 }
 
 .login-box img {
@@ -123,6 +124,3 @@ button:hover {
 
 </body>
 </html>
-.login-box {
-    border: 4px solid red;
-}
