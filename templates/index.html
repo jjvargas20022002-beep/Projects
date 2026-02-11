@@ -295,7 +295,16 @@ function initMap(){
             estadoColor="orange";
         }
 
-        let popupHTML=`<b>CAJA:</b> ${p.caja}<br><b>CLIENTES:</b> ${p.cuenta || ""}`;
+let clientesHTML = "";
+if (p.clientes && p.clientes.length){
+    clientesHTML = "<ul>" + p.clientes.map(c => `<li>${c}</li>`).join("") + "</ul>";
+}
+
+let popupHTML = `
+<b>CAJA:</b> ${p.caja}<br>
+<b>CLIENTES:</b> ${clientesHTML}
+`;
+
 
         const tabsConEstado=[
             "GARANTIAS LIMA",
@@ -330,11 +339,14 @@ initMap();
 
 function focusCuenta(cuenta){
     const coordsInfo={{ coords_info|tojson }};
-    const found=coordsInfo.find(p=>p.cuenta===cuenta);
+    const found = coordsInfo.find(
+        p => p.clientes && p.clientes.includes(cuenta)
+    );
     if(found){
         map.setView([found.lat, found.lng],18);
     }
 }
+
 </script>
 {% endif %}
 
@@ -351,7 +363,10 @@ function focusCuenta(cuenta){
 <tr>
 {% for c in row %}
 <td>
-{% if c and c in (coords_info | map(attribute='cuenta') | list) %}
+{% if c and coords_info
+      | selectattr('clientes','defined')
+      | selectattr('clientes','contains',c)
+      | list %}
 <a href="javascript:void(0)" onclick="focusCuenta('{{ c }}')" style="color:#2563eb;text-decoration:underline">
 {{ c }}
 </a>

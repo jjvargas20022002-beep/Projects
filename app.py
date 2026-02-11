@@ -220,6 +220,7 @@ def index():
     caja_idx = find_col_exact(headers, "CAJA")
     cuenta_idx = find_col(headers, "CUENTA")
 
+    # ================= FILTROS =================
     if selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
         use_filter2 = True
@@ -238,13 +239,20 @@ def index():
 
     rows_after_f1 = [
         r for r in rows_all
-        if len(r) > col1_idx and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+        if col1_idx is not None
+        and len(r) > col1_idx
+        and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
     ]
 
     filtered_rows = [
         r for r in rows_after_f1
-        if not (use_filter2 and col2_idx is not None and selected_filter2)
-        or matches(r[col2_idx], selected_filter2)
+        if not (
+            use_filter2
+            and col2_idx is not None
+            and selected_filter2
+            and len(r) > col2_idx
+            and not matches(r[col2_idx], selected_filter2)
+        )
     ]
 
     filters1 = sorted({
@@ -259,34 +267,51 @@ def index():
         if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip()
     })
 
+    # ================= MAPA =================
     coords_info = []
     show_map_column = coord_idx is not None and selected_tab not in ["CANCELADOS", SINGLE_BRANCH_TAB]
 
     if show_map_column:
+        cajas_map = {}
+
         for r in filtered_rows:
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
                 caja = r[caja_idx].strip().upper() if caja_idx is not None and r[caja_idx] else ""
+                cuenta = r[cuenta_idx] if cuenta_idx is not None else ""
 
-                punto = {
-                    "lat": lat,
-                    "lng": lng,
-                    "caja": caja,
-                    "cuenta": r[cuenta_idx] if cuenta_idx is not None else "",
-                }
+                if not caja:
+                    continue
 
-                if selected_tab == "PENDIENTES ODN" or selected_tab in STATUS_FROM_ODN_TABS:
-                    estado = estado_cajas.get(caja, "").strip()
+                if caja not in cajas_map:
+                    cajas_map[caja] = {
+                        "lat": lat,
+                        "lng": lng,
+                        "caja": caja,
+                        "clientes": set(),
+                        "status": ""
+                    }
 
-                    if estado:
-                        punto["status"] = estado
-                    else:
-                        punto["status"] = "SIN ESTADO"
+                    if selected_tab == "PENDIENTES ODN" or selected_tab in STATUS_FROM_ODN_TABS:
+                        estado = estado_cajas.get(caja, "").strip()
+                        cajas_map[caja]["status"] = estado if estado else "SIN ESTADO"
 
-                coords_info.append(punto)
+                if cuenta:
+                    cajas_map[caja]["clientes"].add(cuenta)
+
             except:
                 pass
 
+        for c in cajas_map.values():
+            coords_info.append({
+                "lat": c["lat"],
+                "lng": c["lng"],
+                "caja": c["caja"],
+                "clientes": sorted(list(c["clientes"])),
+                "status": c["status"],
+            })
+
+    # ================= TABLA =================
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
     if coord_idx is not None:
         hidden_idxs.add(coord_idx)
@@ -319,6 +344,7 @@ def index():
         use_filter2=use_filter2,
         estado_cajas=estado_cajas,
     )
+
 
 # ======================================================
 # EXPORT EXCEL (CORREGIDO – USA XLSXWRITER)
