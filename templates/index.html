@@ -297,8 +297,12 @@ function initMap(){
 
 let clientesHTML = "";
 if (p.clientes && p.clientes.length){
-    clientesHTML = "<ul>" + p.clientes.map(c => `<li>${c}</li>`).join("") + "</ul>";
+    clientesHTML =
+        "<ul style='margin:4px 0 0 0; padding-left:16px'>" +
+        p.clientes.map(c => `<li style="margin:2px 0">${c}</li>`).join("") +
+        "</ul>";
 }
+
 
 let popupHTML = `
 <b>CAJA:</b> ${p.caja}<br>
