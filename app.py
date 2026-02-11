@@ -55,7 +55,7 @@ try:
     if caja_odn_idx is not None and estado_odn_idx is not None:
         for r in odn_rows:
             if len(r) > max(caja_odn_idx, estado_odn_idx):
-                caja = r[caja_odn_idx].strip()
+                caja = r[caja_odn_idx].strip().upper()
                 estado = r[estado_odn_idx].strip()
                 if caja and estado:
                     estado_cajas[caja] = estado
@@ -143,7 +143,7 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2=""):
         use_filter2 = True
 
     col1_idx = find_col(headers, col1_name)
-    col2_idx = find_col_exact(headers, col2_name) if col2_name else None
+    col2_idx = find_col(headers, col2_name) if col2_name else None
 
     def matches(cell_value, filter_value):
         return normalize(cell_value) == normalize(filter_value)
@@ -231,7 +231,7 @@ def index():
         use_filter2 = True
 
     col1_idx = find_col(headers, col1_name)
-    col2_idx = find_col_exact(headers, col2_name) if col2_name else None
+    col2_idx = find_col(headers, col2_name) if col2_name else None
 
     def matches(cell_value, filter_value):
         return normalize(cell_value) == normalize(filter_value)
@@ -266,7 +266,7 @@ def index():
         for r in filtered_rows:
             try:
                 lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
-                caja = r[caja_idx] if caja_idx is not None else ""
+                caja = r[caja_idx].strip().upper() if caja_idx is not None and r[caja_idx] else ""
 
                 punto = {
                     "lat": lat,
@@ -276,8 +276,12 @@ def index():
                 }
 
                 if selected_tab == "PENDIENTES ODN" or selected_tab in STATUS_FROM_ODN_TABS:
-                    if caja in estado_cajas:
-                        punto["status"] = estado_cajas[caja]
+                    estado = estado_cajas.get(caja, "").strip()
+
+                    if estado:
+                        punto["status"] = estado
+                    else:
+                        punto["status"] = "SIN ESTADO"
 
                 coords_info.append(punto)
             except:
@@ -377,7 +381,7 @@ def download_excel():
         use_filter2 = True
 
     col1_idx = find_col(headers, col1_name)
-    col2_idx = find_col_exact(headers, col2_name) if col2_name else None
+    col2_idx = find_col(headers, col2_name) if col2_name else None
 
     def matches(cell_value, filter_value):
         return normalize(cell_value) == normalize(filter_value)
