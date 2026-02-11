@@ -306,8 +306,9 @@ if (p.clientes && p.clientes.length){
 
 let popupHTML = `
 <b>CAJA:</b> ${p.caja}<br>
-<b>CLIENTES:</b> ${clientesHTML}
+<b>CLIENTES:</b><br>${clientesHTML.trim()}
 `;
+
 
 
         const tabsConEstado=[
