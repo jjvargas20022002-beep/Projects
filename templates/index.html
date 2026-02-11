@@ -179,7 +179,7 @@ tr:nth-child(even){
     {% endif %}
 </div>
 
-<form method="get" class="filters" id="filterForm">
+<form method="get" class="filters" id="filterForm" onsubmit="return false;">
 <input type="hidden" name="tab" id="tab_select" value="{{ selected_tab }}">
 <input type="hidden" name="last_tab" value="{{ selected_tab }}">
 
