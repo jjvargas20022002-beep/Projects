@@ -363,10 +363,10 @@ function focusCuenta(cuenta){
 <tr>
 {% for c in row %}
 <td>
-{% if c and coords_info
-      | selectattr('clientes','defined')
-      | selectattr('clientes','contains',c)
-      | list %}
+{% if c and coords_info | selectattr('clientes') | list | selectattr('clientes') and
+      coords_info | map(attribute='clientes') | sum(start=[]) and
+      c in (coords_info | map(attribute='clientes') | sum(start=[])) %}
+
 <a href="javascript:void(0)" onclick="focusCuenta('{{ c }}')" style="color:#2563eb;text-decoration:underline">
 {{ c }}
 </a>
