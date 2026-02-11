@@ -64,7 +64,7 @@ except:
 
 # =====================
 # CONFIG
-# =====================
+# ====================
 BRANCH_TABS = [
     "GARANTIAS LIMA",
     "GARANTIAS PROVINCIA",
