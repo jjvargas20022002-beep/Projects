@@ -168,6 +168,26 @@ tr:nth-child(even){
     overflow-x:auto;
     -webkit-overflow-scrolling:touch;
 }
+/* ============================
+   📍 FIX BOTÓN GEOLOCATION ANDROID WEBVIEW
+   ============================ */
+.leaflet-top,
+.leaflet-bottom {
+    z-index: 2000 !important;
+}
+
+.leaflet-control-container {
+    pointer-events: auto !important;
+}
+
+.leaflet-control {
+    pointer-events: auto !important;
+}
+
+#map {
+    z-index: 1 !important;
+    overflow: visible !important;
+}
 </style>
 </head>
 
@@ -291,7 +311,10 @@ let lastUserLatLng = null;
    ============================ */
 function initMap(){
     if(!map){
-        map = L.map("map");
+        map = L.map("map", {
+    zoomControl: true
+});
+
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
         coberturaLayer = omnivore.kml("/static/cobertura.kml", null,
@@ -375,7 +398,9 @@ function initMap(){
     }
 
     enableUserLocation();
+    setTimeout(() => {
     addMyLocationButton();
+}, 300);
 }
 
 // 🚀 INICIALIZAR MAPA
