@@ -251,8 +251,9 @@ tr:nth-child(even){
 </div>
 
 <script>
+<script>
 /* ============================
-   🎯 ICONOS
+   🧭 ICONOS
    ============================ */
 const ICONS = {
     green:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/green-dot.png",iconSize:[32,32]}),
@@ -274,7 +275,12 @@ function initMap(){
 
         coberturaLayer = omnivore.kml("/static/cobertura.kml", null,
             L.geoJSON(null,{
-                style:{color:"#2563eb",weight:2,fillColor:"#3b82f6",fillOpacity:0.25}
+                style:{
+                    color:"#2563eb",
+                    weight:2,
+                    fillColor:"#3b82f6",
+                    fillOpacity:0.25
+                }
             })
         ).addTo(map);
     }
@@ -346,16 +352,18 @@ function initMap(){
     if(bounds.length){
         map.fitBounds(bounds,{padding:[50,50]});
     }
+
+    addMyLocationButton();
 }
 
 // 🚀 INICIALIZAR MAPA
 initMap();
 
 /* ============================
-   📍 GPS USUARIO
+   📍 GPS USUARIO (SOLO CÍRCULO)
    ============================ */
-let userMarker = null;
 let userCircle = null;
+let lastUserLatLng = null;
 
 function enableUserLocation(){
     if (!map) return;
@@ -367,31 +375,18 @@ function enableUserLocation(){
     });
 
     map.on("locationfound", function(e){
-        const { lat, lng } = e.latlng;
-
-        const userIcon = L.icon({
-            iconUrl: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-            iconSize: [32, 32],
-            iconAnchor: [16, 32]
-        });
-
-        if (!userMarker){
-            userMarker = L.marker([lat, lng], { icon: userIcon })
-                .addTo(map)
-                .bindPopup("📍 Mi ubicación");
-        } else {
-            userMarker.setLatLng([lat, lng]);
-        }
+        const latlng = e.latlng;
+        lastUserLatLng = latlng;
 
         if (!userCircle){
-            userCircle = L.circle([lat, lng], {
+            userCircle = L.circle(latlng, {
                 radius: e.accuracy,
-                color: "#2563eb",
+                color: "#1d4ed8",
                 fillColor: "#3b82f6",
-                fillOpacity: 0.15
+                fillOpacity: 0.25
             }).addTo(map);
         } else {
-            userCircle.setLatLng([lat, lng]);
+            userCircle.setLatLng(latlng);
             userCircle.setRadius(e.accuracy);
         }
     });
@@ -403,6 +398,36 @@ function enableUserLocation(){
 
 // 📍 ACTIVAR GPS
 enableUserLocation();
+
+/* ============================
+   📍 BOTÓN MI UBICACIÓN
+   ============================ */
+L.Control.MyLocation = L.Control.extend({
+    onAdd: function(map){
+        const btn = L.DomUtil.create("button", "leaflet-bar leaflet-control");
+        btn.innerHTML = "📍";
+        btn.title = "Ir a mi ubicación";
+
+        btn.style.width = "34px";
+        btn.style.height = "34px";
+        btn.style.backgroundColor = "white";
+        btn.style.cursor = "pointer";
+        btn.style.fontSize = "18px";
+
+        L.DomEvent.on(btn, "click", function(e){
+            L.DomEvent.stop(e);
+            if(lastUserLatLng){
+                map.setView(lastUserLatLng, 18);
+            }
+        });
+
+        return btn;
+    }
+});
+
+function addMyLocationButton(){
+    new L.Control.MyLocation({ position: "topleft" }).addTo(map);
+}
 
 /* ============================
    🔎 ENFOCAR CLIENTE
@@ -417,6 +442,7 @@ function focusCuenta(cuenta){
     }
 }
 </script>
+
 {% endif %}
 
 <div class="table-scroll">
