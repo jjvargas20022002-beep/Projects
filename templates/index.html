@@ -263,7 +263,7 @@ const ICONS = {
 
 let map;
 let coberturaLayer;
-let userCircle = null;
+let userMarker = null;
 let lastUserLatLng = null;
 
 /* ============================
@@ -354,15 +354,15 @@ function initMap(){
         map.fitBounds(bounds,{padding:[50,50]});
     }
 
-    enableUserLocation();      // ✅ CORRECCIÓN
-    addMyLocationButton();    // botón después del GPS
+    enableUserLocation();
+    addMyLocationButton();
 }
 
 // 🚀 INICIALIZAR MAPA
 initMap();
 
 /* ============================
-   📍 GPS USUARIO (SOLO CÍRCULO)
+   📍 GPS USUARIO (PUNTO TIPO GOOGLE MAPS)
    ============================ */
 function enableUserLocation(){
     if (!map) return;
@@ -376,16 +376,16 @@ function enableUserLocation(){
     map.on("locationfound", function(e){
         lastUserLatLng = e.latlng;
 
-        if (!userCircle){
-            userCircle = L.circle(e.latlng, {
-                radius: e.accuracy,
-                color: "#1d4ed8",
-                fillColor: "#3b82f6",
-                fillOpacity: 0.25
+        if (!userMarker){
+            userMarker = L.circleMarker(e.latlng, {
+                radius: 7,            // 🔵 tamaño pequeño
+                color: "#ffffff",     // borde blanco
+                weight: 2,
+                fillColor: "#1a73e8", // azul Google Maps
+                fillOpacity: 1        // sólido
             }).addTo(map);
         } else {
-            userCircle.setLatLng(e.latlng);
-            userCircle.setRadius(e.accuracy);
+            userMarker.setLatLng(e.latlng);
         }
     });
 
@@ -438,6 +438,7 @@ function focusCuenta(cuenta){
 }
 </script>
 {% endif %}
+
 
 
 <div class="table-scroll">
