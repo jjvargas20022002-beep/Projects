@@ -419,7 +419,10 @@ function enableUserLocation(){
    ============================ */
 L.Control.MyLocation = L.Control.extend({
     onAdd: function(map){
-        const btn = L.DomUtil.create("div", "leaflet-bar");
+        const btn = L.DomUtil.create(
+            "div",
+            "leaflet-control leaflet-bar"
+        );
 
         btn.innerHTML = "📍";
         btn.title = "Ir a mi ubicación";
@@ -436,6 +439,7 @@ L.Control.MyLocation = L.Control.extend({
         btn.style.fontSize = "18px";
 
         L.DomEvent.disableClickPropagation(btn);
+
         btn.onclick = () => {
             if(lastUserLatLng){
                 map.setView(lastUserLatLng, 18);
@@ -446,11 +450,9 @@ L.Control.MyLocation = L.Control.extend({
     }
 });
 
-
 function addMyLocationButton(){
     new L.Control.MyLocation({ position: "topleft" }).addTo(map);
 }
-
 /* ============================
    🔎 ENFOCAR CLIENTE
    ============================ */
