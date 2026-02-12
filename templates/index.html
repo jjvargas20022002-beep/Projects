@@ -251,7 +251,10 @@ tr:nth-child(even){
 </div>
 
 <script>
-const ICONS={
+/* ============================
+   🎯 ICONOS
+   ============================ */
+const ICONS = {
     green:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/green-dot.png",iconSize:[32,32]}),
     red:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/red-dot.png",iconSize:[32,32]}),
     yellow:new L.Icon({iconUrl:"https://maps.google.com/mapfiles/ms/icons/yellow-dot.png",iconSize:[32,32]}),
@@ -261,57 +264,59 @@ const ICONS={
 let map;
 let coberturaLayer;
 
+/* ============================
+   📌 MAPA
+   ============================ */
 function initMap(){
     if(!map){
-        map=L.map("map");
+        map = L.map("map");
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-        coberturaLayer=omnivore.kml("/static/cobertura.kml", null, L.geoJSON(null,{
-            style:{color:"#2563eb",weight:2,fillColor:"#3b82f6",fillOpacity:0.25}
-        })).addTo(map);
+        coberturaLayer = omnivore.kml("/static/cobertura.kml", null,
+            L.geoJSON(null,{
+                style:{color:"#2563eb",weight:2,fillColor:"#3b82f6",fillOpacity:0.25}
+            })
+        ).addTo(map);
     }
 
-    const coordsInfo={{ coords_info|tojson }};
-    const bounds=[];
+    const coordsInfo = {{ coords_info|tojson }};
+    const bounds = [];
 
     coordsInfo.forEach(p=>{
-        let icon=ICONS.blue;
-        const status=(p.status||"").toLowerCase();
+        let icon = ICONS.blue;
+        const status = (p.status || "").toLowerCase();
 
-        let estadoTexto="";
-        let estadoColor="";
+        let estadoTexto = "";
+        let estadoColor = "";
 
         if(status.includes("reparado")){
-            icon=ICONS.green;
-            estadoTexto="Reparado";
-            estadoColor="green";
+            icon = ICONS.green;
+            estadoTexto = "Reparado";
+            estadoColor = "green";
         }else if(status.includes("no plan")){
-            icon=ICONS.red;
-            estadoTexto="No Plan";
-            estadoColor="red";
+            icon = ICONS.red;
+            estadoTexto = "No Plan";
+            estadoColor = "red";
         }else if(status.includes("en plan")){
-            icon=ICONS.yellow;
-            estadoTexto="En Plan";
-            estadoColor="orange";
+            icon = ICONS.yellow;
+            estadoTexto = "En Plan";
+            estadoColor = "orange";
         }
 
-let clientesHTML = "";
-if (p.clientes && p.clientes.length){
-    clientesHTML =
-        "<ul style='margin:4px 0 0 0; padding-left:16px'>" +
-        p.clientes.map(c => `<li style="margin:2px 0">${c}</li>`).join("") +
-        "</ul>";
-}
+        let clientesHTML = "";
+        if(p.clientes && p.clientes.length){
+            clientesHTML =
+                "<ul style='margin:4px 0 0 0; padding-left:16px'>" +
+                p.clientes.map(c => `<li style="margin:2px 0">${c}</li>`).join("") +
+                "</ul>";
+        }
 
+        let popupHTML = `
+            <b>CAJA:</b> ${p.caja}<br>
+            <b>CLIENTES:</b><br>${clientesHTML}
+        `;
 
-let popupHTML = `
-<b>CAJA:</b> ${p.caja}<br>
-<b>CLIENTES:</b><br>${clientesHTML.trim()}
-`;
-
-
-
-        const tabsConEstado=[
+        const tabsConEstado = [
             "GARANTIAS LIMA",
             "LI1 TGI",
             "LI2 DIJUSA",
@@ -323,27 +328,87 @@ let popupHTML = `
         ];
 
         if(
-            (tabsConEstado.includes("{{ selected_tab }}") || "{{ selected_tab }}"==="PENDIENTES ODN")
-            && estadoTexto
+            (tabsConEstado.includes("{{ selected_tab }}") ||
+             "{{ selected_tab }}" === "PENDIENTES ODN") &&
+            estadoTexto
         ){
-            popupHTML+=`<br><b>Estado de la caja:</b> <span style="color:${estadoColor}">${estadoTexto}</span>`;
+            popupHTML += `<br><b>Estado de la caja:</b>
+                          <span style="color:${estadoColor}">${estadoTexto}</span>`;
         }
 
-        L.marker([p.lat,p.lng],{icon})
+        L.marker([p.lat, p.lng], { icon })
             .addTo(map)
             .bindPopup(popupHTML);
 
-        bounds.push([p.lat,p.lng]);
+        bounds.push([p.lat, p.lng]);
     });
 
     if(bounds.length){
         map.fitBounds(bounds,{padding:[50,50]});
     }
 }
+
+// 🚀 INICIALIZAR MAPA
 initMap();
 
+/* ============================
+   📍 GPS USUARIO
+   ============================ */
+let userMarker = null;
+let userCircle = null;
+
+function enableUserLocation(){
+    if (!map) return;
+
+    map.locate({
+        watch: true,
+        enableHighAccuracy: true,
+        setView: false
+    });
+
+    map.on("locationfound", function(e){
+        const { lat, lng } = e.latlng;
+
+        const userIcon = L.icon({
+            iconUrl: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+            iconSize: [32, 32],
+            iconAnchor: [16, 32]
+        });
+
+        if (!userMarker){
+            userMarker = L.marker([lat, lng], { icon: userIcon })
+                .addTo(map)
+                .bindPopup("📍 Mi ubicación");
+        } else {
+            userMarker.setLatLng([lat, lng]);
+        }
+
+        if (!userCircle){
+            userCircle = L.circle([lat, lng], {
+                radius: e.accuracy,
+                color: "#2563eb",
+                fillColor: "#3b82f6",
+                fillOpacity: 0.15
+            }).addTo(map);
+        } else {
+            userCircle.setLatLng([lat, lng]);
+            userCircle.setRadius(e.accuracy);
+        }
+    });
+
+    map.on("locationerror", function(e){
+        console.warn("GPS error:", e.message);
+    });
+}
+
+// 📍 ACTIVAR GPS
+enableUserLocation();
+
+/* ============================
+   🔎 ENFOCAR CLIENTE
+   ============================ */
 function focusCuenta(cuenta){
-    const coordsInfo={{ coords_info|tojson }};
+    const coordsInfo = {{ coords_info|tojson }};
     const found = coordsInfo.find(
         p => p.clientes && p.clientes.includes(cuenta)
     );
@@ -351,7 +416,6 @@ function focusCuenta(cuenta){
         map.setView([found.lat, found.lng],18);
     }
 }
-
 </script>
 {% endif %}
 
@@ -368,11 +432,11 @@ function focusCuenta(cuenta){
 <tr>
 {% for c in row %}
 <td>
-{% if c and coords_info | selectattr('clientes') | list | selectattr('clientes') and
-      coords_info | map(attribute='clientes') | sum(start=[]) and
+{% if c and coords_info | map(attribute='clientes') | sum(start=[]) and
       c in (coords_info | map(attribute='clientes') | sum(start=[])) %}
-
-<a href="javascript:void(0)" onclick="focusCuenta('{{ c }}')" style="color:#2563eb;text-decoration:underline">
+<a href="javascript:void(0)"
+   onclick="focusCuenta('{{ c }}')"
+   style="color:#2563eb;text-decoration:underline">
 {{ c }}
 </a>
 {% else %}
@@ -389,13 +453,12 @@ function focusCuenta(cuenta){
 </table>
 </div>
 
-</div>
-
 <script>
 function changeTab(tab){
-    document.getElementById("tab_select").value=tab;
+    document.getElementById("tab_select").value = tab;
     document.getElementById("filterForm").submit();
 }
+</script>
 
 /* 🔍 FILTRO EN TIEMPO REAL */
 function filterTable(){
