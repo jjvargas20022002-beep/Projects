@@ -251,7 +251,6 @@ tr:nth-child(even){
 </div>
 
 <script>
-<script>
 /* ============================
    🧭 ICONOS
    ============================ */
@@ -264,6 +263,8 @@ const ICONS = {
 
 let map;
 let coberturaLayer;
+let userCircle = null;
+let lastUserLatLng = null;
 
 /* ============================
    📌 MAPA
@@ -353,7 +354,8 @@ function initMap(){
         map.fitBounds(bounds,{padding:[50,50]});
     }
 
-    addMyLocationButton();
+    enableUserLocation();      // ✅ CORRECCIÓN
+    addMyLocationButton();    // botón después del GPS
 }
 
 // 🚀 INICIALIZAR MAPA
@@ -362,9 +364,6 @@ initMap();
 /* ============================
    📍 GPS USUARIO (SOLO CÍRCULO)
    ============================ */
-let userCircle = null;
-let lastUserLatLng = null;
-
 function enableUserLocation(){
     if (!map) return;
 
@@ -375,18 +374,17 @@ function enableUserLocation(){
     });
 
     map.on("locationfound", function(e){
-        const latlng = e.latlng;
-        lastUserLatLng = latlng;
+        lastUserLatLng = e.latlng;
 
         if (!userCircle){
-            userCircle = L.circle(latlng, {
+            userCircle = L.circle(e.latlng, {
                 radius: e.accuracy,
                 color: "#1d4ed8",
                 fillColor: "#3b82f6",
                 fillOpacity: 0.25
             }).addTo(map);
         } else {
-            userCircle.setLatLng(latlng);
+            userCircle.setLatLng(e.latlng);
             userCircle.setRadius(e.accuracy);
         }
     });
@@ -395,9 +393,6 @@ function enableUserLocation(){
         console.warn("GPS error:", e.message);
     });
 }
-
-// 📍 ACTIVAR GPS
-enableUserLocation();
 
 /* ============================
    📍 BOTÓN MI UBICACIÓN
@@ -442,8 +437,8 @@ function focusCuenta(cuenta){
     }
 }
 </script>
-
 {% endif %}
+
 
 <div class="table-scroll">
 <table>
