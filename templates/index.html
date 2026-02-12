@@ -419,26 +419,33 @@ function enableUserLocation(){
    ============================ */
 L.Control.MyLocation = L.Control.extend({
     onAdd: function(map){
-        const btn = L.DomUtil.create("button", "leaflet-bar leaflet-control");
+        const btn = L.DomUtil.create("div", "leaflet-bar");
+
         btn.innerHTML = "📍";
         btn.title = "Ir a mi ubicación";
 
         btn.style.width = "34px";
         btn.style.height = "34px";
-        btn.style.backgroundColor = "white";
+        btn.style.background = "white";
+        btn.style.display = "flex";
+        btn.style.alignItems = "center";
+        btn.style.justifyContent = "center";
         btn.style.cursor = "pointer";
+        btn.style.borderRadius = "4px";
+        btn.style.boxShadow = "0 2px 6px rgba(0,0,0,.3)";
         btn.style.fontSize = "18px";
 
-        L.DomEvent.on(btn, "click", function(e){
-            L.DomEvent.stop(e);
+        L.DomEvent.disableClickPropagation(btn);
+        btn.onclick = () => {
             if(lastUserLatLng){
                 map.setView(lastUserLatLng, 18);
             }
-        });
+        };
 
         return btn;
     }
 });
+
 
 function addMyLocationButton(){
     new L.Control.MyLocation({ position: "topleft" }).addTo(map);
@@ -500,7 +507,6 @@ function changeTab(tab){
     document.getElementById("tab_select").value = tab;
     document.getElementById("filterForm").submit();
 }
-</script>
 
 /* 🔍 FILTRO EN TIEMPO REAL */
 function filterTable(){
