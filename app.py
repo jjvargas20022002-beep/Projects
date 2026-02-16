@@ -87,12 +87,33 @@ STATUS_FROM_ODN_TABS = [
 ]
 
 # =====================
-# LOGIN
+# LOGIN (ADMIN SIN RESTRICCIONES)
 # =====================
 USERS = {
-    "vtp76066116": "Fbb@12.2025",
-    "vtp62146884": "Fbb@12.2025",
-    "vtp72925383": "Fbb@02.2026"
+    "vtp72437856": {
+        "password": "Bitel@123",
+        "role": "admin"
+    },
+    "vtp72925383": {
+        "password": "Bitel@123",
+        "role": "admin"
+    },
+    "vtp76066116": {
+        "password": "Bitel@123",
+        "role": "admin"
+    },
+    "vtp62146884": {
+        "password": "Bitel@123",
+        "role": "admin"
+    },
+    "vtp74746195": {
+        "password": "Bitel@123",
+        "role": "admin"
+    },
+    "515816": {
+        "password": "Bitel@123",
+        "role": "admin"
+    }
 }
 
 # =====================
@@ -180,9 +201,13 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip().lower()
         password = request.form.get("password", "").strip()
-        if username in USERS and USERS[username] == password:
-            session["user"] = username
-            return redirect(url_for("index"))
+        if (
+    		username in USERS
+    		and USERS[username]["password"] == password
+	):
+    		session["user"] = username
+    		session["role"] = USERS[username]["role"]  # admin
+    		return redirect(url_for("index"))
         else:
             error = "Usuario o contraseña incorrectos"
     return render_template("login.html", error=error)
