@@ -201,16 +201,19 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip().lower()
         password = request.form.get("password", "").strip()
+
         if (
-    		username in USERS
-    		and USERS[username]["password"] == password
-	):
-    		session["user"] = username
-    		session["role"] = USERS[username]["role"]  # admin
-    		return redirect(url_for("index"))
+            username in USERS
+            and USERS[username]["password"] == password
+        ):
+            session["user"] = username
+            session["role"] = USERS[username]["role"]
+            return redirect(url_for("index"))
         else:
             error = "Usuario o contraseña incorrectos"
+
     return render_template("login.html", error=error)
+
 
 @app.route("/logout")
 def logout():
