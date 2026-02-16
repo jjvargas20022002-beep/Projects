@@ -126,6 +126,16 @@ select, button{
     cursor:pointer;
 }
 
+.access-info{
+    font-size:13px;
+    background:#eef2ff;
+    color:#1e3a8a;
+    border:1px solid #c7d2fe;
+    border-radius:6px;
+    padding:7px 10px;
+}
+
+
 /* MAP */
 #map-container{
     display:block;
@@ -204,6 +214,15 @@ tr:nth-child(even){
 <input type="hidden" name="tab" id="tab_select" value="{{ selected_tab }}">
 <input type="hidden" name="last_tab" value="{{ selected_tab }}">
 
+{% if not user_info.is_admin %}
+<input type="hidden" name="filter1" value="{{ selected_filter1 }}">
+<input type="hidden" name="filter2" value="{{ selected_filter2 }}">
+<div class="access-info">
+Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
+{% if user_info.partner %}| PARTNER: <b>{{ user_info.partner }}</b>{% endif %}
+</div>
+{% else %}
+
 {% if selected_tab == "ONLINE LIMA" %}
 <select name="filter1" onchange="this.form.submit()">
 <option value="">BRANCH</option>
@@ -241,6 +260,7 @@ tr:nth-child(even){
 <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
 {% endfor %}
 </select>
+{% endif %}
 {% endif %}
 
 <!-- BOTÓN DESCARGA EXCEL (CORRECTO CON FLASK) -->

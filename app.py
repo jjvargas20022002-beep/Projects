@@ -4,6 +4,7 @@ from google.oauth2.service_account import Credentials
 import os
 import pandas as pd
 from io import BytesIO
+from pathlib import Path
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "secret_key_temporal")
@@ -87,13 +88,67 @@ STATUS_FROM_ODN_TABS = [
 ]
 
 # =====================
-# LOGIN
+# LOGIN DESDE STAFF.xlsx
 # =====================
-USERS = {
-    "vtp76066116": "Fbb@12.2025",
-    "vtp62146884": "Fbb@12.2025",
-    "vtp72925383": "Fbb@02.2026"
+STAFF_PATH = Path(os.environ.get("STAFF_FILE_PATH", Path(__file__).resolve().parent / "STAFF.xlsx"))
+ADMIN_USERS = {
+    username.strip().lower()
+    for username in os.environ.get("ADMIN_USERS", "").split(",")
+    if username.strip()
 }
+
+def load_staff_users():
+    users = {}
+
+    if not STAFF_PATH.exists():
+        return users
+
+    try:
+        staff_df = pd.read_excel(STAFF_PATH, dtype=str).fillna("")
+    except Exception:
+        return users
+
+    normalized_columns = {normalize(col): col for col in staff_df.columns}
+
+    username_col = normalized_columns.get("USUARIO") or normalized_columns.get("USERNAME")
+    password_col = (
+        normalized_columns.get("CONTRASEÑA")
+        or normalized_columns.get("CONTRASENA")
+        or normalized_columns.get("PASSWORD")
+    )
+    role_col = normalized_columns.get("ROLE")
+    branch_col = normalized_columns.get("BRANCH")
+    partner_col = normalized_columns.get("PARTNER")
+
+    if not username_col or not password_col:
+        return users
+
+    for _, row in staff_df.iterrows():
+        username = str(row.get(username_col, "")).strip().lower()
+        password = str(row.get(password_col, "")).strip()
+        role = str(row.get(role_col, "")).strip() if role_col else ""
+        branch = str(row.get(branch_col, "")).strip() if branch_col else ""
+        partner = str(row.get(partner_col, "")).strip() if partner_col else ""
+
+        if not username or not password:
+            continue
+
+        is_admin = (
+            username in ADMIN_USERS
+            or normalize(role) == "ADMIN"
+            or normalize(branch) == "ADMIN"
+            or normalize(partner) == "ADMIN"
+        )
+
+        users[username] = {
+            "password": password,
+            "role": role,
+            "branch": branch,
+            "partner": partner,
+            "is_admin": is_admin,
+        }
+
+    return users
 
 # =====================
 # UTILS
@@ -108,6 +163,8 @@ def coord_to_link(value):
 def normalize(text):
     return "".join(text.upper().split()) if text else ""
 
+USERS = load_staff_users()
+
 def find_col(headers, expected_name):
     expected = normalize(expected_name)
     for i, h in enumerate(headers):
@@ -121,14 +178,54 @@ def find_col_exact(headers, expected_name):
             return i
     return None
 
+def find_col_from_candidates(headers, candidates):
+    for candidate in candidates:
+        idx = find_col(headers, candidate)
+        if idx is not None:
+            return idx
+    return None
+
+
+def apply_user_access_filter(rows, headers, user_info):
+    if not user_info or user_info.get("is_admin"):
+        return rows
+
+    branch_idx = find_col_from_candidates(headers, ["BRANCH", "SITE"])
+    partner_idx = find_col_from_candidates(headers, ["CONTRATA", "REPORTE DE CONTRATA", "PARTNER"])
+
+    allowed_branch = normalize(user_info.get("branch", ""))
+    allowed_partner = normalize(user_info.get("partner", ""))
+
+    def has_access(row):
+        branch_ok = True
+        partner_ok = True
+
+        if branch_idx is not None and allowed_branch and len(row) > branch_idx:
+            branch_ok = normalize(row[branch_idx]) == allowed_branch
+
+        if partner_idx is not None and allowed_partner and len(row) > partner_idx:
+            partner_ok = normalize(row[partner_idx]) == allowed_partner
+
+        return branch_ok and partner_ok
+
+    return [r for r in rows if has_access(r)]
+
+
+def get_session_user_info():
+    username = session.get("user")
+    if not username:
+        return None
+    return USERS.get(username.lower())
+
 # ======================================================
 # FUNCIÓN COMPARTIDA PARA FILTROS
 # ======================================================
-def get_filtered_data(selected_tab, selected_filter1="", selected_filter2=""):
+def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", user_info=None):
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
+    rows_all = apply_user_access_filter(rows_all, headers, user_info)
 
     coord_idx = find_col(headers, "COORDENADAS")
 
@@ -150,13 +247,16 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2=""):
 
     rows_after_f1 = [
         r for r in rows_all
-        if len(r) > col1_idx and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+        if col1_idx is not None
+        and len(r) > col1_idx
+        and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+
     ]
 
     filtered_rows = [
         r for r in rows_after_f1
         if not (use_filter2 and col2_idx is not None and selected_filter2)
-        or matches(r[col2_idx], selected_filter2)
+        or (len(r) > col2_idx and matches(r[col2_idx], selected_filter2))
     ]
 
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
@@ -180,8 +280,12 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip().lower()
         password = request.form.get("password", "").strip()
-        if username in USERS and USERS[username] == password:
+        user_data = USERS.get(username)
+        if user_data and user_data.get("password") == password:
             session["user"] = username
+            session["is_admin"] = user_data.get("is_admin", False)
+            session["branch"] = user_data.get("branch", "")
+            session["partner"] = user_data.get("partner", "")
             return redirect(url_for("index"))
         else:
             error = "Usuario o contraseña incorrectos"
@@ -200,13 +304,18 @@ def index():
     if "user" not in session:
         return redirect(url_for("login"))
 
+    user_info = get_session_user_info() or {}
+
     tabs = [ws.title for ws in sheet.worksheets()]
     selected_tab = request.args.get("tab", tabs[0])
     last_tab = request.args.get("last_tab", "")
     selected_filter1 = request.args.get("filter1", "").strip()
     selected_filter2 = request.args.get("filter2", "").strip()
 
-    if last_tab != selected_tab:
+    if not user_info.get("is_admin"):
+        selected_filter1 = user_info.get("branch", "")
+        selected_filter2 = user_info.get("partner", "")
+    elif last_tab != selected_tab:
         selected_filter1 = ""
         selected_filter2 = ""
 
@@ -214,6 +323,7 @@ def index():
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
+    rows_all = apply_user_access_filter(rows_all, headers, user_info)
     total_rows = len(rows_all)
 
     coord_idx = find_col(headers, "COORDENADAS")
@@ -343,6 +453,7 @@ def index():
         show_map_column=show_map_column,
         use_filter2=use_filter2,
         estado_cajas=estado_cajas,
+        user_info=user_info,
     )
 
 
@@ -357,8 +468,13 @@ def export_excel():
     tab = request.args.get("tab")
     filter1 = request.args.get("filter1", "")
     filter2 = request.args.get("filter2", "")
+    user_info = get_session_user_info()
 
-    headers, rows = get_filtered_data(tab, filter1, filter2)
+    if user_info and not user_info.get("is_admin"):
+        filter1 = user_info.get("branch", "")
+        filter2 = user_info.get("partner", "")
+
+    headers, rows = get_filtered_data(tab, filter1, filter2, user_info=user_info)
 
     df = pd.DataFrame(rows, columns=headers)
 
@@ -388,11 +504,13 @@ def download_excel():
     selected_tab = request.args.get("tab")
     selected_filter1 = request.args.get("filter1", "").strip()
     selected_filter2 = request.args.get("filter2", "").strip()
+    user_info = get_session_user_info()
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
+    rows_all = apply_user_access_filter(rows_all, headers, user_info)
 
     coord_idx = find_col(headers, "COORDENADAS")
 
@@ -414,14 +532,15 @@ def download_excel():
 
     rows_after_f1 = [
         r for r in rows_all
-        if len(r) > col1_idx and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+        if col1_idx is not None
+        and len(r) > col1_idx
+        and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
     ]
 
     filtered_rows = [
         r for r in rows_after_f1
         if not (use_filter2 and col2_idx is not None and selected_filter2)
-        or matches(r[col2_idx], selected_filter2)
-    ]
+        or (len(r) > col2_idx and matches(r[col2_idx], selected_filter2))    ]
 
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
     if coord_idx is not None:
