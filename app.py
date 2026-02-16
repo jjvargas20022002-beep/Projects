@@ -119,6 +119,11 @@ def load_staff_users():
     role_col = normalized_columns.get("ROLE")
     branch_col = normalized_columns.get("BRANCH")
     partner_col = normalized_columns.get("PARTNER")
+    access_cols = [
+        col
+        for normalized_name, col in normalized_columns.items()
+        if normalized_name.startswith("ACCESS")
+    ]
 
     if not username_col or not password_col:
         return users
@@ -129,6 +134,12 @@ def load_staff_users():
         role = str(row.get(role_col, "")).strip() if role_col else ""
         branch = str(row.get(branch_col, "")).strip() if branch_col else ""
         partner = str(row.get(partner_col, "")).strip() if partner_col else ""
+        allowed_tabs = [
+            str(row.get(col, "")).strip()
+            for col in access_cols
+            if str(row.get(col, "")).strip()
+        ]
+
 
         if not username or not password:
             continue
@@ -146,6 +157,7 @@ def load_staff_users():
             "branch": branch,
             "partner": partner,
             "is_admin": is_admin,
+            "allowed_tabs": allowed_tabs,
         }
 
     return users
@@ -210,6 +222,21 @@ def find_col_from_candidates(headers, candidates):
             return idx
     return None
 
+def is_partner_branch_wide(user_info):
+    return normalize((user_info or {}).get("partner", "")) == "BITEL"
+
+
+def get_allowed_tabs(all_tabs, user_info):
+    if not user_info or user_info.get("is_admin"):
+        return all_tabs
+
+    allowed_tabs = user_info.get("allowed_tabs") or []
+    if not allowed_tabs:
+        return all_tabs
+
+    allowed_set = {normalize(tab) for tab in allowed_tabs if tab}
+    return [tab for tab in all_tabs if normalize(tab) in allowed_set]
+
 
 def apply_user_access_filter(rows, headers, user_info):
     if not user_info or user_info.get("is_admin"):
@@ -220,6 +247,7 @@ def apply_user_access_filter(rows, headers, user_info):
 
     allowed_branch = normalize(user_info.get("branch", ""))
     allowed_partner = normalize(user_info.get("partner", ""))
+    branch_wide_partner = is_partner_branch_wide(user_info)
 
     def has_access(row):
         branch_ok = True
@@ -228,7 +256,7 @@ def apply_user_access_filter(rows, headers, user_info):
         if branch_idx is not None and allowed_branch and len(row) > branch_idx:
             branch_ok = normalize(row[branch_idx]) == allowed_branch
 
-        if partner_idx is not None and allowed_partner and len(row) > partner_idx:
+        if not branch_wide_partner and partner_idx is not None and allowed_partner and len(row) > partner_idx:
             partner_ok = normalize(row[partner_idx]) == allowed_partner
 
         return branch_ok and partner_ok
@@ -248,6 +276,7 @@ def get_session_user_info():
     session["is_admin"] = user_info.get("is_admin", False)
     session["branch"] = user_info.get("branch", "")
     session["partner"] = user_info.get("partner", "")
+    session["allowed_tabs"] = user_info.get("allowed_tabs", [])
 
     return user_info
 
@@ -318,7 +347,7 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip().lower()
         password = request.form.get("password", "").strip()
-        user_data = USERS.get(username)
+        user_data = get_users().get(username)
         if user_data and user_data.get("password") == password:
             session["user"] = username
             session["is_admin"] = user_data.get("is_admin", False)
@@ -342,17 +371,26 @@ def index():
     if "user" not in session:
         return redirect(url_for("login"))
 
-    user_info = get_session_user_info() or {}
+    user_info = get_session_user_info()
+    if not user_info:
+        session.clear()
+        return redirect(url_for("login"))
 
-    tabs = [ws.title for ws in sheet.worksheets()]
+    tabs_all = [ws.title for ws in sheet.worksheets()]
+    tabs = get_allowed_tabs(tabs_all, user_info)
+    if not tabs:
+        return "No tienes pestañas asignadas", 403
+
     selected_tab = request.args.get("tab", tabs[0])
+    if selected_tab not in tabs:
+        selected_tab = tabs[0]
     last_tab = request.args.get("last_tab", "")
     selected_filter1 = request.args.get("filter1", "").strip()
     selected_filter2 = request.args.get("filter2", "").strip()
 
     if not user_info.get("is_admin"):
         selected_filter1 = user_info.get("branch", "")
-        selected_filter2 = user_info.get("partner", "")
+        selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
     elif last_tab != selected_tab:
         selected_filter1 = ""
         selected_filter2 = ""
@@ -507,10 +545,17 @@ def export_excel():
     filter1 = request.args.get("filter1", "")
     filter2 = request.args.get("filter2", "")
     user_info = get_session_user_info()
+    if not user_info:
+        session.clear()
+        return redirect(url_for("login"))
 
-    if user_info and not user_info.get("is_admin"):
+    allowed_tabs = get_allowed_tabs([ws.title for ws in sheet.worksheets()], user_info)
+    if tab not in allowed_tabs:
+        return redirect(url_for("index"))
+
+    if not user_info.get("is_admin"):
         filter1 = user_info.get("branch", "")
-        filter2 = user_info.get("partner", "")
+        filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
 
     headers, rows = get_filtered_data(tab, filter1, filter2, user_info=user_info)
 
@@ -531,6 +576,7 @@ def export_excel():
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+
 # =====================
 # DOWNLOAD EXCEL (ORIGINAL)
 # =====================
@@ -543,12 +589,24 @@ def download_excel():
     selected_filter1 = request.args.get("filter1", "").strip()
     selected_filter2 = request.args.get("filter2", "").strip()
     user_info = get_session_user_info()
+    if not user_info:
+        session.clear()
+        return redirect(url_for("login"))
+
+    allowed_tabs = get_allowed_tabs([ws.title for ws in sheet.worksheets()], user_info)
+    if selected_tab not in allowed_tabs:
+        return redirect(url_for("index"))
+
+    if not user_info.get("is_admin"):
+        selected_filter1 = user_info.get("branch", "")
+        selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
     rows_all = apply_user_access_filter(rows_all, headers, user_info)
+
 
     coord_idx = find_col(headers, "COORDENADAS")
 
