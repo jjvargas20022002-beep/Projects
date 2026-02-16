@@ -90,6 +90,17 @@ STATUS_FROM_ODN_TABS = [
     "LI7 MARCOS",
 ]
 
+UNFILTERED_ACCESS_TABS = {
+    "LI1 TGI",
+    "LI2 DIJUSA",
+    "LI2 ERAM",
+    "LI4 INTER",
+    "LI4 TGI",
+    "LI4 BROKERS",
+    "LI7 MARCOS",
+}
+
+
 # =====================
 # LOGIN DESDE STAFF.xlsx
 # =====================
@@ -268,11 +279,25 @@ def get_allowed_tabs(all_tabs, user_info):
 
     return resolved_tabs
 
+def has_unfiltered_tab_access(user_info, selected_tab):
+    if not user_info or user_info.get("is_admin") or not selected_tab:
+        return False
+
+    normalized_unfiltered_tabs = {normalize(t) for t in UNFILTERED_ACCESS_TABS}
+    if normalize(selected_tab) not in normalized_unfiltered_tabs:
+        return False
+
+    allowed_tabs = get_allowed_tabs([selected_tab], user_info)
+    return selected_tab in allowed_tabs
 
 
-def apply_user_access_filter(rows, headers, user_info):
+def apply_user_access_filter(rows, headers, user_info, selected_tab=None):
     if not user_info or user_info.get("is_admin"):
         return rows
+
+    if has_unfiltered_tab_access(user_info, selected_tab):
+        return rows
+
 
     branch_idx = find_col_from_candidates(headers, ["BRANCH", "SITE"])
     partner_idx = find_col_from_candidates(headers, ["CONTRATA", "REPORTE DE CONTRATA", "PARTNER"])
@@ -320,8 +345,7 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
-    rows_all = apply_user_access_filter(rows_all, headers, user_info)
-
+    rows_all = apply_user_access_filter(rows_all, headers, user_info, selected_tab=selected_tab)
     coord_idx = find_col(headers, "COORDENADAS")
 
     if selected_tab in BRANCH_TABS:
@@ -421,8 +445,13 @@ def index():
     selected_filter2 = request.args.get("filter2", "").strip()
 
     if not user_info.get("is_admin"):
-        selected_filter1 = user_info.get("branch", "")
-        selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
+        if has_unfiltered_tab_access(user_info, selected_tab):
+            selected_filter1 = ""
+            selected_filter2 = ""
+        else:
+            selected_filter1 = user_info.get("branch", "")
+            selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
+
     elif last_tab != selected_tab:
         selected_filter1 = ""
         selected_filter2 = ""
@@ -431,7 +460,7 @@ def index():
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
-    rows_all = apply_user_access_filter(rows_all, headers, user_info)
+    rows_all = apply_user_access_filter(rows_all, headers, user_info, selected_tab=selected_tab)
     total_rows = len(rows_all)
 
     coord_idx = find_col(headers, "COORDENADAS")
@@ -586,8 +615,13 @@ def export_excel():
         return redirect(url_for("index"))
 
     if not user_info.get("is_admin"):
-        filter1 = user_info.get("branch", "")
-        filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
+        if has_unfiltered_tab_access(user_info, tab):
+            filter1 = ""
+            filter2 = ""
+        else:
+            filter1 = user_info.get("branch", "")
+            filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
+
 
     headers, rows = get_filtered_data(tab, filter1, filter2, user_info=user_info)
 
@@ -630,15 +664,19 @@ def download_excel():
         return redirect(url_for("index"))
 
     if not user_info.get("is_admin"):
-        selected_filter1 = user_info.get("branch", "")
-        selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
+        if has_unfiltered_tab_access(user_info, selected_tab):
+            selected_filter1 = ""
+            selected_filter2 = ""
+        else:
+            selected_filter1 = user_info.get("branch", "")
+            selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
+
 
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
-    rows_all = apply_user_access_filter(rows_all, headers, user_info)
-
+    rows_all = apply_user_access_filter(rows_all, headers, user_info, selected_tab=selected_tab)
 
     coord_idx = find_col(headers, "COORDENADAS")
 
