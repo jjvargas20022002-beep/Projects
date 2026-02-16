@@ -163,7 +163,32 @@ def coord_to_link(value):
 def normalize(text):
     return "".join(text.upper().split()) if text else ""
 
-USERS = load_staff_users()
+
+USERS = {}
+USERS_SIGNATURE = None
+
+
+def get_staff_signature():
+    if not STAFF_PATH.exists():
+        return None
+
+    stat_result = STAFF_PATH.stat()
+    return (stat_result.st_mtime_ns, stat_result.st_size)
+
+
+def get_users(force_reload=False):
+    global USERS, USERS_SIGNATURE
+
+    current_signature = get_staff_signature()
+
+    if force_reload or USERS_SIGNATURE != current_signature:
+        USERS = load_staff_users()
+        USERS_SIGNATURE = current_signature
+
+    return USERS
+
+
+get_users(force_reload=True)
 
 def find_col(headers, expected_name):
     expected = normalize(expected_name)
@@ -215,7 +240,16 @@ def get_session_user_info():
     username = session.get("user")
     if not username:
         return None
-    return USERS.get(username.lower())
+
+    user_info = get_users().get(username.lower())
+    if not user_info:
+        return None
+
+    session["is_admin"] = user_info.get("is_admin", False)
+    session["branch"] = user_info.get("branch", "")
+    session["partner"] = user_info.get("partner", "")
+
+    return user_info
 
 # ======================================================
 # FUNCIÓN COMPARTIDA PARA FILTROS
@@ -270,6 +304,10 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
     ]
 
     return visible_headers, visible_rows
+@app.before_request
+def refresh_staff_cache():
+    get_users()
+
 
 # =====================
 # LOGIN ROUTES
