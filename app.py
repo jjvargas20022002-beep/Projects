@@ -5,6 +5,9 @@ import os
 import pandas as pd
 from io import BytesIO
 from pathlib import Path
+import difflib
+import unicodedata
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "secret_key_temporal")
@@ -175,6 +178,13 @@ def coord_to_link(value):
 def normalize(text):
     return "".join(text.upper().split()) if text else ""
 
+def normalize_key(text):
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFKD", str(text))
+    without_accents = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return "".join(ch for ch in without_accents.upper() if ch.isalnum())
+
 
 USERS = {}
 USERS_SIGNATURE = None
@@ -230,12 +240,34 @@ def get_allowed_tabs(all_tabs, user_info):
     if not user_info or user_info.get("is_admin"):
         return all_tabs
 
-    allowed_tabs = user_info.get("allowed_tabs") or []
+    allowed_tabs = [tab for tab in (user_info.get("allowed_tabs") or []) if tab]
     if not allowed_tabs:
         return all_tabs
 
-    allowed_set = {normalize(tab) for tab in allowed_tabs if tab}
-    return [tab for tab in all_tabs if normalize(tab) in allowed_set]
+
+    normalized_all_tabs = {normalize_key(tab): tab for tab in all_tabs}
+    available_keys = list(normalized_all_tabs.keys())
+
+    resolved_tabs = []
+    for raw_tab in allowed_tabs:
+        requested_key = normalize_key(raw_tab)
+        if not requested_key:
+            continue
+
+        exact = normalized_all_tabs.get(requested_key)
+        if exact:
+            if exact not in resolved_tabs:
+                resolved_tabs.append(exact)
+            continue
+
+        close = difflib.get_close_matches(requested_key, available_keys, n=1, cutoff=0.82)
+        if close:
+            candidate = normalized_all_tabs[close[0]]
+            if candidate not in resolved_tabs:
+                resolved_tabs.append(candidate)
+
+    return resolved_tabs
+
 
 
 def apply_user_access_filter(rows, headers, user_info):
@@ -379,7 +411,7 @@ def index():
     tabs_all = [ws.title for ws in sheet.worksheets()]
     tabs = get_allowed_tabs(tabs_all, user_info)
     if not tabs:
-        return "No tienes pestañas asignadas", 403
+        return "No tienes pestañas asignadas. Revisa columnas access_* en STAFF.xlsx (nombres de pestañas).", 403
 
     selected_tab = request.args.get("tab", tabs[0])
     if selected_tab not in tabs:
