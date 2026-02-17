@@ -179,6 +179,14 @@ tr:nth-child(even){
     -webkit-overflow-scrolling:touch;
 }
 
+.footer-credit{
+    margin-top:14px;
+    padding:10px 12px;
+    border-top:1px solid #d1d5db;
+    color:#4b5563;
+    font-size:12px;
+}
+
 </style>
 </head>
 
@@ -299,6 +307,11 @@ Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
 {% if show_map_column %}
 <div id="map-container">
     <div id="map"></div>
+</div>
+
+<div class="footer-credit">
+    <div><b>Creado por:</b> Juan Vargas Saldaña</div>
+    <div><b>Contacto:</b> +51 917 839 267</div>
 </div>
 
 <script>
@@ -538,6 +551,11 @@ function focusCuenta(cuenta){
 {% endfor %}
 </tbody>
 </table>
+</div>
+
+<div class="footer-credit">
+    <div><b>Creado por:</b> FBB-Juan Vargas Saldaña</div>
+    <div><b>Contacto:</b> +51 917 839 267</div>
 </div>
 
 <script>
