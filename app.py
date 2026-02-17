@@ -100,6 +100,13 @@ UNFILTERED_ACCESS_TABS = {
     "LI7 MARCOS",
 }
 
+PROVINCIA_TABS = {
+    "GARANTIAS PROVINCIA",
+    "FUERA DE GARANTÍA PROVINCIA",
+}
+
+PROVINCIA_BRANCHES = {"ARE", "CAJ", "CUS", "HUN", "JUN", "LAL", "PIU", "SAN"}
+
 
 # =====================
 # LOGIN DESDE STAFF.xlsx
@@ -246,6 +253,12 @@ def find_col_from_candidates(headers, candidates):
 def is_partner_branch_wide(user_info):
     return normalize((user_info or {}).get("partner", "")) == "BITEL"
 
+def is_provincia_scope(selected_tab, user_info):
+    if normalize(selected_tab) not in {normalize(t) for t in PROVINCIA_TABS}:
+        return False
+
+    return normalize((user_info or {}).get("branch", "")) in PROVINCIA_BRANCHES
+
 
 def get_allowed_tabs(all_tabs, user_info):
     if not user_info or user_info.get("is_admin"):
@@ -305,6 +318,7 @@ def apply_user_access_filter(rows, headers, user_info, selected_tab=None):
     allowed_branch = normalize(user_info.get("branch", ""))
     allowed_partner = normalize(user_info.get("partner", ""))
     branch_wide_partner = is_partner_branch_wide(user_info)
+    provincia_scope = is_provincia_scope(selected_tab, user_info)
 
     def has_access(row):
         branch_ok = True
@@ -313,8 +327,16 @@ def apply_user_access_filter(rows, headers, user_info, selected_tab=None):
         if branch_idx is not None and allowed_branch and len(row) > branch_idx:
             branch_ok = normalize(row[branch_idx]) == allowed_branch
 
-        if not branch_wide_partner and partner_idx is not None and allowed_partner and len(row) > partner_idx:
+        if (
+            not branch_wide_partner
+            and partner_idx is not None
+            and allowed_partner
+            and len(row) > partner_idx
+        ):
             partner_ok = normalize(row[partner_idx]) == allowed_partner
+        if provincia_scope:
+            return branch_ok and partner_ok
+
 
         return branch_ok and partner_ok
 
