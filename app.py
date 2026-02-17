@@ -99,6 +99,16 @@ UNFILTERED_ACCESS_TABS = {
     "LI4 BROKERS",
     "LI7 MARCOS",
 }
+UNFILTERED_PARTNER_TABS = {
+    "LI1 TGI",
+    "LI2 DIJUSA",
+    "LI2 ERAM",
+    "LI3 INTER",
+    "LI4 TGI",
+    "LI4 BROKERS",
+    "LI7 MARCOS",
+}
+
 
 PROVINCIA_TABS = {
     "GARANTIAS PROVINCIA",
@@ -359,10 +369,63 @@ def get_session_user_info():
 
     return user_info
 
+def get_extra_filter_config(headers, selected_tab, user_info=None):
+    if (user_info or {}).get("is_admin"):
+        return []
+
+    tab_norm = normalize(selected_tab)
+    bitel_partner = is_partner_branch_wide(user_info)
+    filters = []
+
+    if tab_norm == normalize("GARANTIAS LIMA"):
+        if bitel_partner:
+            contrata_idx = find_col(headers, "CONTRATA")
+            if contrata_idx is not None:
+                filters.append(("contrata_filter", "CONTRATA", contrata_idx))
+        return filters
+
+    if tab_norm == normalize("PENDIENTES ODN"):
+        site_idx = find_col(headers, "SITE")
+        if site_idx is not None:
+            filters.append(("site_filter", "SITE", site_idx))
+
+        status_idx = find_col(headers, "STATUS DE LA CAJA")
+        if status_idx is not None:
+            filters.append(("status_caja_filter", "STATUS DE LA CAJA", status_idx))
+
+        contrata_idx = find_col(headers, "CONTRATA")
+        if contrata_idx is not None:
+            filters.append(("contrata_filter", "CONTRATA", contrata_idx))
+        return filters
+
+    if tab_norm in {normalize(t) for t in UNFILTERED_PARTNER_TABS}:
+        site_idx = find_col(headers, "SITE")
+        if site_idx is not None:
+            filters.append(("site_filter", "SITE", site_idx))
+
+        reporte_idx = find_col(headers, "Reporte de Contrata")
+        if reporte_idx is not None:
+            filters.append(("reporte_contrata_filter", "Reporte de Contrata", reporte_idx))
+        return filters
+
+    if tab_norm == normalize("GARANTIAS PROVINCIA"):
+        if bitel_partner:
+            contrata_idx = find_col(headers, "CONTRATA")
+            if contrata_idx is not None:
+                filters.append(("contrata_filter", "CONTRATA", contrata_idx))
+        return filters
+
+    if tab_norm == normalize("FUERA DE GARANTÍA PROVINCIA"):
+        site_idx = find_col(headers, "SITE")
+        if site_idx is not None:
+            filters.append(("site_filter", "SITE", site_idx))
+
+    return filters
+
 # ======================================================
 # FUNCIÓN COMPARTIDA PARA FILTROS
 # ======================================================
-def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", user_info=None):
+def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", user_info=None, extra_filters=None):
     ws = sheet.worksheet(selected_tab)
     data = ws.get_all_values()
     headers = data[0]
@@ -400,6 +463,17 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
         if not (use_filter2 and col2_idx is not None and selected_filter2)
         or (len(r) > col2_idx and matches(r[col2_idx], selected_filter2))
     ]
+
+    if extra_filters:
+        extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
+        for param_name, _, col_idx in extra_filter_config:
+            filter_value = (extra_filters.get(param_name) or "").strip()
+            if not filter_value:
+                continue
+            filtered_rows = [
+                r for r in filtered_rows
+                if len(r) > col_idx and matches(r[col_idx], filter_value)
+            ]
 
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
     if coord_idx is not None:
@@ -466,6 +540,12 @@ def index():
     last_tab = request.args.get("last_tab", "")
     selected_filter1 = request.args.get("filter1", "").strip()
     selected_filter2 = request.args.get("filter2", "").strip()
+    extra_filters = {
+        "site_filter": request.args.get("site_filter", "").strip(),
+        "contrata_filter": request.args.get("contrata_filter", "").strip(),
+        "reporte_contrata_filter": request.args.get("reporte_contrata_filter", "").strip(),
+        "status_caja_filter": request.args.get("status_caja_filter", "").strip(),
+    }
 
     if not user_info.get("is_admin"):
         if has_unfiltered_tab_access(user_info, selected_tab):
@@ -528,6 +608,31 @@ def index():
             and not matches(r[col2_idx], selected_filter2)
         )
     ]
+    extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
+    if not user_info.get("is_admin"):
+        for param_name, _, col_idx in extra_filter_config:
+            filter_value = extra_filters.get(param_name, "")
+            if not filter_value:
+                continue
+            filtered_rows = [
+                r for r in filtered_rows
+                if len(r) > col_idx and matches(r[col_idx], filter_value)
+            ]
+
+    extra_filter_options = []
+    if not user_info.get("is_admin"):
+        for param_name, label, col_idx in extra_filter_config:
+            options = sorted({
+                r[col_idx]
+                for r in rows_after_f1
+                if len(r) > col_idx and r[col_idx].strip()
+            })
+            extra_filter_options.append({
+                "name": param_name,
+                "label": label,
+                "selected": extra_filters.get(param_name, ""),
+                "options": options,
+            })
 
     filters1 = sorted({
         r[col1_idx]
@@ -616,6 +721,7 @@ def index():
         is_branch_tab=selected_tab in BRANCH_TABS or selected_tab == SINGLE_BRANCH_TAB,
         show_map_column=show_map_column,
         use_filter2=use_filter2,
+        extra_filter_options=extra_filter_options,
         estado_cajas=estado_cajas,
         user_info=user_info,
     )
@@ -632,6 +738,13 @@ def export_excel():
     tab = request.args.get("tab")
     filter1 = request.args.get("filter1", "")
     filter2 = request.args.get("filter2", "")
+    extra_filters = {
+        "site_filter": request.args.get("site_filter", "").strip(),
+        "contrata_filter": request.args.get("contrata_filter", "").strip(),
+        "reporte_contrata_filter": request.args.get("reporte_contrata_filter", "").strip(),
+        "status_caja_filter": request.args.get("status_caja_filter", "").strip(),
+    }
+
     user_info = get_session_user_info()
     if not user_info:
         session.clear()
@@ -649,8 +762,7 @@ def export_excel():
             filter1 = user_info.get("branch", "")
             filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
 
-
-    headers, rows = get_filtered_data(tab, filter1, filter2, user_info=user_info)
+    headers, rows = get_filtered_data(tab, filter1, filter2, user_info=user_info, extra_filters=extra_filters)
 
     df = pd.DataFrame(rows, columns=headers)
 
@@ -681,6 +793,12 @@ def download_excel():
     selected_tab = request.args.get("tab")
     selected_filter1 = request.args.get("filter1", "").strip()
     selected_filter2 = request.args.get("filter2", "").strip()
+    extra_filters = {
+        "site_filter": request.args.get("site_filter", "").strip(),
+        "contrata_filter": request.args.get("contrata_filter", "").strip(),
+        "reporte_contrata_filter": request.args.get("reporte_contrata_filter", "").strip(),
+    }
+
     user_info = get_session_user_info()
     if not user_info:
         session.clear()
@@ -736,6 +854,17 @@ def download_excel():
         r for r in rows_after_f1
         if not (use_filter2 and col2_idx is not None and selected_filter2)
         or (len(r) > col2_idx and matches(r[col2_idx], selected_filter2))    ]
+    if not user_info.get("is_admin"):
+        extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
+        for param_name, _, col_idx in extra_filter_config:
+            filter_value = extra_filters.get(param_name, "")
+            if not filter_value:
+                continue
+            filtered_rows = [
+                r for r in filtered_rows
+                if len(r) > col_idx and matches(r[col_idx], filter_value)
+            ]
+
 
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
     if coord_idx is not None:
