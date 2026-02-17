@@ -538,6 +538,7 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
     ]
 
     return visible_headers, visible_rows
+
 @app.before_request
 def refresh_staff_cache():
     get_users()
