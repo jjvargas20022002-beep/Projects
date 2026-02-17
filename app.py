@@ -386,13 +386,14 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
     def matches(cell_value, filter_value):
         return normalize(cell_value) == normalize(filter_value)
 
-    rows_after_f1 = [
-        r for r in rows_all
-        if col1_idx is not None
-        and len(r) > col1_idx
-        and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
-
-    ]
+    if col1_idx is None:
+        rows_after_f1 = rows_all
+    else:
+        rows_after_f1 = [
+            r for r in rows_all
+            if len(r) > col1_idx
+            and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+        ]
 
     filtered_rows = [
         r for r in rows_after_f1
@@ -506,12 +507,16 @@ def index():
     def matches(cell_value, filter_value):
         return normalize(cell_value) == normalize(filter_value)
 
-    rows_after_f1 = [
-        r for r in rows_all
-        if col1_idx is not None
-        and len(r) > col1_idx
-        and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
-    ]
+
+    if col1_idx is None:
+        rows_after_f1 = rows_all
+    else:
+        rows_after_f1 = [
+            r for r in rows_all
+            if len(r) > col1_idx
+            and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+        ]
+
 
     filtered_rows = [
         r for r in rows_after_f1
@@ -718,12 +723,14 @@ def download_excel():
     def matches(cell_value, filter_value):
         return normalize(cell_value) == normalize(filter_value)
 
-    rows_after_f1 = [
-        r for r in rows_all
-        if col1_idx is not None
-        and len(r) > col1_idx
-        and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
-    ]
+    if col1_idx is None:
+        rows_after_f1 = rows_all
+    else:
+        rows_after_f1 = [
+            r for r in rows_all
+            if len(r) > col1_idx
+            and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+        ]
 
     filtered_rows = [
         r for r in rows_after_f1
