@@ -473,7 +473,7 @@ def get_extra_filter_config(headers, selected_tab, user_info=None):
 # FUNCIÓN COMPARTIDA PARA FILTROS
 # ======================================================
 def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", user_info=None, extra_filters=None):
-   sheet_client, _ = get_sheet_or_error()
+    sheet_client, _ = get_sheet_or_error()
     if sheet_client is None:
         return [], []
 
