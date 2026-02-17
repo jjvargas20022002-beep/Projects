@@ -17,54 +17,101 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "secret_key_temporal")
 # =====================
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
-creds = Credentials.from_service_account_info(
-    {
-        "type": "service_account",
-        "project_id": os.environ["GCP_PROJECT_ID"],
-        "private_key_id": os.environ["GCP_PRIVATE_KEY_ID"],
-        "private_key": os.environ["GCP_PRIVATE_KEY"].replace("\\n", "\n"),
-        "client_email": os.environ["GCP_CLIENT_EMAIL"],
-        "client_id": os.environ["GCP_CLIENT_ID"],
-        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-        "token_uri": "https://oauth2.googleapis.com/token",
-        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": os.environ["GCP_CLIENT_CERT_URL"],
-    },
-    scopes=SCOPES,
-)
+SHEET_INIT_ERROR = None
+sheet = None
 
-gc = gspread.authorize(creds)
-sheet = gc.open_by_key(os.environ["SPREADSHEET_ID"])
+
+def init_google_sheet():
+    global sheet, SHEET_INIT_ERROR
+
+    required_env = [
+        "GCP_PROJECT_ID",
+        "GCP_PRIVATE_KEY_ID",
+        "GCP_PRIVATE_KEY",
+        "GCP_CLIENT_EMAIL",
+        "GCP_CLIENT_ID",
+        "GCP_CLIENT_CERT_URL",
+        "SPREADSHEET_ID",
+    ]
+    missing_vars = [var for var in required_env if not os.environ.get(var)]
+    if missing_vars:
+        SHEET_INIT_ERROR = f"Faltan variables de entorno: {', '.join(missing_vars)}"
+        sheet = None
+        return
+
+    try:
+        creds = Credentials.from_service_account_info(
+            {
+                "type": "service_account",
+                "project_id": os.environ["GCP_PROJECT_ID"],
+                "private_key_id": os.environ["GCP_PRIVATE_KEY_ID"],
+                "private_key": os.environ["GCP_PRIVATE_KEY"].replace("\\n", "\n"),
+                "client_email": os.environ["GCP_CLIENT_EMAIL"],
+                "client_id": os.environ["GCP_CLIENT_ID"],
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_x509_cert_url": os.environ["GCP_CLIENT_CERT_URL"],
+            },
+            scopes=SCOPES,
+        )
+        gc = gspread.authorize(creds)
+        sheet = gc.open_by_key(os.environ["SPREADSHEET_ID"])
+        SHEET_INIT_ERROR = None
+    except Exception as exc:
+        sheet = None
+        SHEET_INIT_ERROR = f"No se pudo conectar a Google Sheets: {exc}"
+
+
+def get_sheet_or_error():
+    if sheet is None:
+        init_google_sheet()
+    return sheet, SHEET_INIT_ERROR
+
 
 # =====================
 # ESTADO DE CAJAS DESDE PENDIENTES ODN
 # =====================
 estado_cajas = {}
 
-try:
-    ws_odn = sheet.worksheet("PENDIENTES ODN")
-    odn_data = ws_odn.get_all_values()
-    odn_headers = odn_data[0]
-    odn_rows = odn_data[1:]
 
-    caja_odn_idx = None
-    estado_odn_idx = None
+def refresh_estado_cajas():
+    global estado_cajas
 
-    for i, h in enumerate(odn_headers):
-        if h.strip().upper() == "CAJA":
-            caja_odn_idx = i
-        if "STATUS DE LA CAJA" in h.strip().upper():
-            estado_odn_idx = i
-
-    if caja_odn_idx is not None and estado_odn_idx is not None:
-        for r in odn_rows:
-            if len(r) > max(caja_odn_idx, estado_odn_idx):
-                caja = r[caja_odn_idx].strip().upper()
-                estado = r[estado_odn_idx].strip()
-                if caja and estado:
-                    estado_cajas[caja] = estado
-except:
     estado_cajas = {}
+
+    sheet_client, _ = get_sheet_or_error()
+    if sheet_client is None:
+        return
+
+    try:
+        ws_odn = sheet_client.worksheet("PENDIENTES ODN")
+        odn_data = ws_odn.get_all_values()
+        odn_headers = odn_data[0]
+        odn_rows = odn_data[1:]
+
+        caja_odn_idx = None
+        estado_odn_idx = None
+
+        for i, h in enumerate(odn_headers):
+            if h.strip().upper() == "CAJA":
+                caja_odn_idx = i
+            if "STATUS DE LA CAJA" in h.strip().upper():
+                estado_odn_idx = i
+
+        if caja_odn_idx is not None and estado_odn_idx is not None:
+            for r in odn_rows:
+                if len(r) > max(caja_odn_idx, estado_odn_idx):
+                    caja = r[caja_odn_idx].strip().upper()
+                    estado = r[estado_odn_idx].strip()
+                    if caja and estado:
+                        estado_cajas[caja] = estado
+    except Exception:
+        estado_cajas = {}
+
+
+init_google_sheet()
+refresh_estado_cajas()
 
 # =====================
 # CONFIG
@@ -426,7 +473,12 @@ def get_extra_filter_config(headers, selected_tab, user_info=None):
 # FUNCIÓN COMPARTIDA PARA FILTROS
 # ======================================================
 def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", user_info=None, extra_filters=None):
-    ws = sheet.worksheet(selected_tab)
+   sheet_client, _ = get_sheet_or_error()
+    if sheet_client is None:
+        return [], []
+
+    ws = sheet_client.worksheet(selected_tab)
+
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
@@ -529,7 +581,12 @@ def index():
         session.clear()
         return redirect(url_for("login"))
 
-    tabs_all = [ws.title for ws in sheet.worksheets()]
+    sheet_client, sheet_error = get_sheet_or_error()
+    if sheet_client is None:
+        return f"Error de configuración de Google Sheets: {sheet_error}", 503
+
+    tabs_all = [ws.title for ws in sheet_client.worksheets()]
+
     tabs = get_allowed_tabs(tabs_all, user_info)
     if not tabs:
         return "No tienes pestañas asignadas. Revisa columnas access_* en STAFF.xlsx (nombres de pestañas).", 403
@@ -559,7 +616,8 @@ def index():
         selected_filter1 = ""
         selected_filter2 = ""
 
-    ws = sheet.worksheet(selected_tab)
+
+    ws = sheet_client.worksheet(selected_tab)
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
@@ -750,7 +808,12 @@ def export_excel():
         session.clear()
         return redirect(url_for("login"))
 
-    allowed_tabs = get_allowed_tabs([ws.title for ws in sheet.worksheets()], user_info)
+    sheet_client, sheet_error = get_sheet_or_error()
+    if sheet_client is None:
+        return f"Error de configuración de Google Sheets: {sheet_error}", 503
+
+    allowed_tabs = get_allowed_tabs([ws.title for ws in sheet_client.worksheets()], user_info)
+
     if tab not in allowed_tabs:
         return redirect(url_for("index"))
 
@@ -804,7 +867,13 @@ def download_excel():
         session.clear()
         return redirect(url_for("login"))
 
-    allowed_tabs = get_allowed_tabs([ws.title for ws in sheet.worksheets()], user_info)
+
+    sheet_client, sheet_error = get_sheet_or_error()
+    if sheet_client is None:
+        return f"Error de configuración de Google Sheets: {sheet_error}", 503
+
+    allowed_tabs = get_allowed_tabs([ws.title for ws in sheet_client.worksheets()], user_info)
+
     if selected_tab not in allowed_tabs:
         return redirect(url_for("index"))
 
@@ -817,7 +886,8 @@ def download_excel():
             selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
 
 
-    ws = sheet.worksheet(selected_tab)
+
+    ws = sheet_client.worksheet(selected_tab)
     data = ws.get_all_values()
     headers = data[0]
     rows_all = data[1:]
