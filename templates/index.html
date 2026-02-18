@@ -63,6 +63,17 @@ body{
     height:32px;
 }
 
+.user-scope-badge{
+    font-size:12px;
+    color:#111827;
+    background:#f3f4f6;
+    border:1px solid #e5e7eb;
+    border-radius:999px;
+    padding:4px 8px;
+    white-space:nowrap;
+    min-height:18px;
+}
+
 .logout{
     background:#ef4444;
     border:none;
@@ -243,6 +254,7 @@ tr:nth-child(even){
 <div class="header">
     <h1>Averías Pendientes FTTH</h1>
     <div class="header-right">
+        <span class="user-scope-badge">{{ user_scope_label }}</span>
         <img src="{{ url_for('static', filename='bitel.png') }}">
         <a href="/logout"><button class="logout">Cerrar sesión</button></a>
     </div>
@@ -443,26 +455,51 @@ function initMap(){
 
     const coordsInfo = {{ coords_info|tojson }};
     const bounds = [];
+    const deploymentStatusStyles = [
+        {match: ["desplegado"], marker: "green", bg: "#18794e", text: "#ffffff", label: "Desplegado"},
+        {match: ["en proceso"], marker: "yellow", bg: "#e9c46a", text: "#111827", label: "En proceso"},
+        {match: ["en plan"], marker: "yellow", bg: "#f4e6b8", text: "#7c5d00", label: "En plan"},
+        {match: ["no se puede contactar"], marker: "red", bg: "#b70000", text: "#ffffff", label: "No se puede contactar"},
+        {match: ["cancelar"], marker: "red", bg: "#a40000", text: "#ffffff", label: "Cancelar"},
+        {match: ["prob. caja", "problema caja", "problema de caja"], marker: "red", bg: "#b00000", text: "#ffffff", label: "Prob. caja"},
+        {match: ["reprogramado"], marker: "yellow", bg: "#e9c5a5", text: "#111827", label: "Reprogramado"},
+        {match: ["en otra br"], marker: "blue", bg: "#dbeafe", text: "#1d4ed8", label: "En otra BR"},
+        {match: ["cuenta test"], marker: "red", bg: "#fee2e2", text: "#b91c1c", label: "Cuenta test"},
+        {match: ["necesita soporte fbb"], marker: "red", bg: "#c40000", text: "#ffffff", label: "Necesita soporte FBB"},
+        {match: ["cerrado"], marker: "green", bg: "#1f7a4f", text: "#ffffff", label: "Cerrado"},
+    ];
+
+    function getDeploymentStatusStyle(rawStatus){
+        const normalized = (rawStatus || "").toLowerCase().trim();
+        if(!normalized){
+            return null;
+        }
+
+        const found = deploymentStatusStyles.find(s =>
+            s.match.some(m => normalized.includes(m))
+        );
+
+        if(found){
+            return found;
+        }
+
+        return {
+            marker: "blue",
+            bg: "#e5e7eb",
+            text: "#111827",
+            label: rawStatus
+        };
+    }
+
 
     coordsInfo.forEach(p=>{
         let icon = ICONS.blue;
-        const status = (p.status || "").toLowerCase();
+        const status = (p.status || "").trim();
+        const statusStyle = getDeploymentStatusStyle(status);
 
-        let estadoTexto = "";
-        let estadoColor = "";
+        if(statusStyle && ICONS[statusStyle.marker]){
+            icon = ICONS[statusStyle.marker];
 
-        if(status.includes("reparado")){
-            icon = ICONS.green;
-            estadoTexto = "Reparado";
-            estadoColor = "green";
-        }else if(status.includes("no plan")){
-            icon = ICONS.red;
-            estadoTexto = "No Plan";
-            estadoColor = "red";
-        }else if(status.includes("en plan")){
-            icon = ICONS.yellow;
-            estadoTexto = "En Plan";
-            estadoColor = "orange";
         }
 
         let clientesHTML = "";
@@ -483,19 +520,22 @@ function initMap(){
             "LI1 TGI",
             "LI2 DIJUSA",
             "LI2 ERAM",
-            "LI4 INTER",
+            "LI3 INTER",
             "LI4 TGI",
             "LI4 BROKERS",
             "LI7 MARCOS"
         ];
 
-        if(
+        if("{{ selected_tab }}" === "DESPLIEGUE" && statusStyle){
+            popupHTML += `<br><b>Status:</b>
+                <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${statusStyle.bg};color:${statusStyle.text};font-weight:600;">${statusStyle.label}</span>`;
+        } else if(
             (tabsConEstado.includes("{{ selected_tab }}") ||
              "{{ selected_tab }}" === "PENDIENTES ODN") &&
-            estadoTexto
+            status
         ){
-            popupHTML += `<br><b>Estado de la caja:</b>
-                          <span style="color:${estadoColor}">${estadoTexto}</span>`;
+            popupHTML += `<br><b>Estado de la caja:</b> ${status}`;
+
         }
 
         L.marker([p.lat, p.lng], { icon })

@@ -958,26 +958,26 @@ def index():
                 cuenta = r[cuenta_idx] if cuenta_idx is not None and len(r) > cuenta_idx else ""
 
 
-                if not caja:
-                    continue
+                marker_key = caja or f"SIN_CAJA_{lat:.6f}_{lng:.6f}"
 
-                if caja not in cajas_map:
-                    cajas_map[caja] = {
+
+                if marker_key not in cajas_map:
+                    cajas_map[marker_key] = {
                         "lat": lat,
                         "lng": lng,
-                        "caja": caja,
+                        "caja": caja or "SIN CAJA",
                         "clientes": set(),
                         "status": ""
                     }
 
                     if selected_tab == DEPLOYMENT_TAB and status_idx is not None and len(r) > status_idx:
-                        cajas_map[caja]["status"] = r[status_idx].strip()
+                        cajas_map[marker_key]["status"] = r[status_idx].strip()
                     elif selected_tab == "PENDIENTES ODN" or selected_tab in STATUS_FROM_ODN_TABS:
-                        estado = estado_cajas.get(caja, "").strip()
-                        cajas_map[caja]["status"] = estado if estado else "SIN ESTADO"
+                        estado = estado_cajas.get(caja, "").strip() if caja else ""
+                        cajas_map[marker_key]["status"] = estado if estado else "SIN ESTADO"
 
                 if cuenta:
-                    cajas_map[caja]["clientes"].add(cuenta)
+                    cajas_map[marker_key]["clientes"].add(cuenta)
 
             except:
                 pass
@@ -1030,6 +1030,11 @@ def index():
         reset_feedback=reset_feedback,
         reset_status=reset_status,
         is_deployment_tab=selected_tab == DEPLOYMENT_TAB,
+        user_scope_label=(
+            ""
+            if user_info.get("is_admin")
+            else f"{(user_info.get('branch') or 'N/A')} - {(user_info.get('partner') or 'N/A')}"
+        ),
     )
 
 
