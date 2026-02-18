@@ -737,16 +737,15 @@ def index():
 
     reset_status = request.args.get("reset_status", "").strip()
     reset_user = request.args.get("reset_user", "").strip()
-    reset_feedback = None
-    if reset_status == "done":
-        reset_feedback = f"Reset OK: {reset_user}. Ahora usa la contraseña de STAFF.xlsx"
-    elif reset_status == "already_default":
-        reset_feedback = f"{reset_user} ya estaba usando la contraseña de STAFF.xlsx"
-    elif reset_status == "not_found":
-        reset_feedback = f"Usuario no encontrado: {reset_user}"
-    elif reset_status == "invalid":
-    elif reset_status == "error":
-        reset_feedback = f"No se pudo completar el reset de {reset_user}. Revisa logs del servidor."
+    
+    reset_feedback_messages = {
+        "done": f"Reset OK: {reset_user}. Ahora usa la contraseña de STAFF.xlsx",
+        "already_default": f"{reset_user} ya estaba usando la contraseña de STAFF.xlsx",
+        "not_found": f"Usuario no encontrado: {reset_user}",
+        "invalid": "Usuario inválido para reset",
+        "error": f"No se pudo completar el reset de {reset_user}. Revisa logs del servidor.",
+    }
+    reset_feedback = reset_feedback_messages.get(reset_status)
 
     if not user_info.get("is_admin"):
         if has_unfiltered_tab_access(user_info, selected_tab):
