@@ -7,6 +7,9 @@ from io import BytesIO
 from pathlib import Path
 import difflib
 import unicodedata
+import json
+from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 app = Flask(__name__)
@@ -175,6 +178,20 @@ ADMIN_USERS = {
     if username.strip()
 }
 
+PASSWORD_OVERRIDES_PATH = Path(
+    os.environ.get(
+        "PASSWORD_OVERRIDES_PATH",
+        Path(__file__).resolve().parent / "password_overrides.json",
+    )
+)
+PASSWORD_AUDIT_LOG_PATH = Path(
+    os.environ.get(
+        "PASSWORD_AUDIT_LOG_PATH",
+        Path(__file__).resolve().parent / "password_changes.log",
+    )
+)
+
+
 def load_staff_users():
     users = {}
 
@@ -283,6 +300,56 @@ def get_users(force_reload=False):
         USERS_SIGNATURE = current_signature
 
     return USERS
+
+def load_password_overrides():
+    if not PASSWORD_OVERRIDES_PATH.exists():
+        return {}
+
+    try:
+        with PASSWORD_OVERRIDES_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return {}
+
+    return data if isinstance(data, dict) else {}
+
+
+def save_password_overrides(overrides):
+    PASSWORD_OVERRIDES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with PASSWORD_OVERRIDES_PATH.open("w", encoding="utf-8") as f:
+        json.dump(overrides, f, ensure_ascii=False, indent=2)
+
+
+def append_password_audit(username):
+    PASSWORD_AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    with PASSWORD_AUDIT_LOG_PATH.open("a", encoding="utf-8") as f:
+        f.write(f"{timestamp}\t{username}\tPASSWORD_CHANGED\n")
+
+
+def verify_user_password(username, password, user_data=None):
+    if not username or not password:
+        return False
+
+    username = username.strip().lower()
+    user_data = user_data or get_users().get(username)
+    if not user_data:
+        return False
+
+    overrides = load_password_overrides()
+    hashed = overrides.get(username)
+    if hashed:
+        return check_password_hash(hashed, password)
+
+    return user_data.get("password") == password
+
+
+def update_user_password(username, new_password):
+    username = username.strip().lower()
+    overrides = load_password_overrides()
+    overrides[username] = generate_password_hash(new_password)
+    save_password_overrides(overrides)
+    append_password_audit(username)
 
 
 get_users(force_reload=True)
@@ -550,19 +617,55 @@ def refresh_staff_cache():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
+    success = "Contraseña actualizada correctamente. Inicia sesión con tu nueva contraseña." if request.args.get("changed") == "1" else None
+
     if request.method == "POST":
         username = request.form.get("username", "").strip().lower()
         password = request.form.get("password", "").strip()
         user_data = get_users().get(username)
-        if user_data and user_data.get("password") == password:
+
+        if user_data and verify_user_password(username, password, user_data=user_data):
             session["user"] = username
             session["is_admin"] = user_data.get("is_admin", False)
             session["branch"] = user_data.get("branch", "")
             session["partner"] = user_data.get("partner", "")
             return redirect(url_for("index"))
+
+        error = "Usuario o contraseña incorrectos"
+
+    return render_template("login.html", error=error, success=success)
+
+
+
+@app.route("/change_password", methods=["GET", "POST"])
+def change_password():
+    error = None
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip().lower()
+        old_password = request.form.get("old_password", "").strip()
+        new_password = request.form.get("new_password", "").strip()
+        repeat_new_password = request.form.get("repeat_new_password", "").strip()
+
+        user_data = get_users().get(username)
+        if not user_data:
+            error = "Usuario no encontrado"
+        elif not verify_user_password(username, old_password, user_data=user_data):
+            error = "La contraseña antigua es incorrecta"
+        elif not new_password:
+            error = "La nueva contraseña no puede estar vacía"
+        elif new_password != repeat_new_password:
+            error = "Las contraseñas nuevas no coinciden"
+        elif new_password == old_password:
+            error = "La nueva contraseña debe ser distinta a la anterior"
+
         else:
-            error = "Usuario o contraseña incorrectos"
-    return render_template("login.html", error=error)
+            update_user_password(username, new_password)
+            session.clear()
+            return redirect(url_for("login", changed="1"))
+
+    return render_template("change_password.html", error=error)
+
 
 @app.route("/logout")
 def logout():
