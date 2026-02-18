@@ -8,6 +8,7 @@ from pathlib import Path
 import difflib
 import unicodedata
 import json
+import re
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -275,19 +276,45 @@ def get_coord_indices(headers):
     lng_idx = find_col_from_candidates(headers, ["LNG", "LONG", "LONGITUD"])
     return coord_idx, lat_idx, lng_idx
 
+def parse_coord_text(value):
+    text = (value or "").strip()
+    if not text:
+        return None
+
+    # Acepta formatos como:
+    # -16.3781,-71.5062
+    # -16,3781,-71,5062
+    # -16,3781; -71,5062
+    matches = re.findall(r"[-+]?\d+(?:[\.,]\d+)?", text)
+    if len(matches) < 2:
+        return None
+
+    try:
+        lat = float(matches[0].replace(",", "."))
+        lng = float(matches[1].replace(",", "."))
+    except Exception:
+        return None
+
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None
+
+    return lat, lng
+
 
 def get_row_lat_lng(row, coord_idx=None, lat_idx=None, lng_idx=None):
     try:
         if coord_idx is not None and len(row) > coord_idx and row[coord_idx].strip():
-            lat, lng = map(float, row[coord_idx].replace(" ", "").split(",", 1))
-            return lat, lng
+            parsed = parse_coord_text(row[coord_idx])
+            if parsed:
+                return parsed
+
 
         if (
             lat_idx is not None and lng_idx is not None
             and len(row) > max(lat_idx, lng_idx)
             and row[lat_idx].strip() and row[lng_idx].strip()
         ):
-            return float(row[lat_idx]), float(row[lng_idx])
+            return float(row[lat_idx].replace(",", ".")), float(row[lng_idx].replace(",", "."))
     except Exception:
         return None
 
