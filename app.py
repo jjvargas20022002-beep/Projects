@@ -685,7 +685,11 @@ def admin_reset_password():
     if not target_user:
         return redirect(url_for("index", reset_status="not_found", reset_user=username))
 
-    was_reset = reset_user_password_override(username)
+    try:
+        was_reset = reset_user_password_override(username)
+    except Exception:
+        return redirect(url_for("index", reset_status="error", reset_user=username))
+
     status = "done" if was_reset else "already_default"
     return redirect(url_for("index", reset_status=status, reset_user=username))
 
@@ -741,7 +745,8 @@ def index():
     elif reset_status == "not_found":
         reset_feedback = f"Usuario no encontrado: {reset_user}"
     elif reset_status == "invalid":
-        reset_feedback = "Usuario inválido para reset"
+    elif reset_status == "error":
+        reset_feedback = f"No se pudo completar el reset de {reset_user}. Revisa logs del servidor."
 
     if not user_info.get("is_admin"):
         if has_unfiltered_tab_access(user_info, selected_tab):

@@ -137,7 +137,7 @@ select, button{
 
 
 .admin-reset-box{
-    margin:12px 0;
+    margin:10px 0 12px;
     padding:10px;
     background:#fff;
     border:1px solid #d1d5db;
@@ -173,6 +173,14 @@ select, button{
     color:#92400e;
     background:#fffbeb;
     border-color:#fcd34d;
+}
+
+.hidden-reset{
+    display:none;
+}
+
+.reset-toggle-btn{
+    white-space:nowrap;
 }
 
 
@@ -264,16 +272,6 @@ tr:nth-child(even){
 </div>
 {% endif %}
 
-{% if user_info.is_admin %}
-<form method="post" action="{{ url_for('admin_reset_password') }}" class="admin-reset-box" onsubmit="return confirmReset(this)">
-    <strong>Reset contraseña (admin):</strong>
-    <input type="text" name="username" placeholder="Usuario objetivo (ej: vtp12345678)" required>
-    <button type="submit">Resetear a STAFF.xlsx</button>
-    <small>Debes ingresar el usuario de la cuenta a resetear, no necesariamente tu usuario admin.</small>
-</form>
-{% endif %}
-
-
 <form method="get" class="filters" id="filterForm" onsubmit="return false;">
 <input type="hidden" name="tab" id="tab_select" value="{{ selected_tab }}">
 <input type="hidden" name="last_tab" value="{{ selected_tab }}">
@@ -358,7 +356,21 @@ Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
     onkeyup="filterTable()"
     style="min-width:220px;"
 >
+
+
+{% if user_info.is_admin %}
+<button type="button" class="reset-toggle-btn" onclick="toggleResetBox()">🔐 Reset contraseña</button>
+{% endif %}
 </form>
+
+{% if user_info.is_admin %}
+<form id="adminResetForm" method="post" action="{{ url_for('admin_reset_password') }}" class="admin-reset-box hidden-reset" onsubmit="return confirmReset(this)">
+    <strong>Reset contraseña (admin):</strong>
+    <input type="text" name="username" placeholder="Usuario objetivo (ej: vtp12345678)" required>
+    <button type="submit">Resetear a STAFF.xlsx</button>
+    <small>Debes ingresar el usuario de la cuenta a resetear, no necesariamente tu usuario admin.</small>
+</form>
+{% endif %}
 
 {% if show_map_column %}
 <div id="map-container">
@@ -366,6 +378,7 @@ Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
 </div>
 
 <script>
+
 /* ============================
    🧭 ICONOS
    ============================ */
@@ -620,6 +633,28 @@ function confirmReset(form){
 
     return confirm(`¿Seguro que deseas resetear la contraseña de ${target}?`);
 }
+
+function toggleResetBox(){
+    const box = document.getElementById("adminResetForm");
+    if(!box){
+        return;
+    }
+
+    box.classList.toggle("hidden-reset");
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+    const box = document.getElementById("adminResetForm");
+    if(!box){
+        return;
+    }
+
+    const hasFeedback = {{ 'true' if reset_feedback else 'false' }};
+    if(hasFeedback){
+        box.classList.remove("hidden-reset");
+    }
+});
+
 
 function changeTab(tab){
     document.getElementById("tab_select").value = tab;
