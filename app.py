@@ -128,6 +128,7 @@ BRANCH_TABS = [
 ]
 
 SINGLE_BRANCH_TAB = "ONLINE LIMA"
+DEPLOYMENT_TAB = "DESPLIEGUE"
 
 STATUS_FROM_ODN_TABS = [
     "GARANTIAS LIMA",
@@ -266,6 +267,31 @@ def coord_to_link(value):
         return f"https://www.google.com/maps?q={lat},{lng}"
     except:
         return None
+
+
+def get_coord_indices(headers):
+    coord_idx = find_col_from_candidates(headers, ["COORDENADAS", "COORDENADA", "COORD", "LAT,LNG", "LATITUD,LONGITUD"])
+    lat_idx = find_col_from_candidates(headers, ["LAT", "LATITUD"])
+    lng_idx = find_col_from_candidates(headers, ["LNG", "LONG", "LONGITUD"])
+    return coord_idx, lat_idx, lng_idx
+
+
+def get_row_lat_lng(row, coord_idx=None, lat_idx=None, lng_idx=None):
+    try:
+        if coord_idx is not None and len(row) > coord_idx and row[coord_idx].strip():
+            lat, lng = map(float, row[coord_idx].replace(" ", "").split(",", 1))
+            return lat, lng
+
+        if (
+            lat_idx is not None and lng_idx is not None
+            and len(row) > max(lat_idx, lng_idx)
+            and row[lat_idx].strip() and row[lng_idx].strip()
+        ):
+            return float(row[lat_idx]), float(row[lng_idx])
+    except Exception:
+        return None
+
+    return None
 
 def normalize(text):
     return "".join(text.upper().split()) if text else ""
@@ -486,14 +512,36 @@ def get_session_user_info():
     return user_info
 
 def get_extra_filter_config(headers, selected_tab, user_info=None):
-    if (user_info or {}).get("is_admin"):
+    tab_norm = normalize(selected_tab)
+    is_admin = (user_info or {}).get("is_admin")
+    if is_admin and tab_norm != normalize(DEPLOYMENT_TAB):
         return []
 
-    tab_norm = normalize(selected_tab)
     bitel_partner = is_partner_branch_wide(user_info)
     filters = []
 
     if tab_norm == normalize("GARANTIAS LIMA"):
+        if bitel_partner:
+            contrata_idx = find_col(headers, "CONTRATA")
+            if contrata_idx is not None:
+                filters.append(("contrata_filter", "CONTRATA", contrata_idx))
+        return filters
+
+    if tab_norm == normalize(DEPLOYMENT_TAB):
+        if (user_info or {}).get("is_admin"):
+            contrata_idx = find_col(headers, "CONTRATA")
+            if contrata_idx is not None:
+                filters.append(("contrata_filter", "CONTRATA", contrata_idx))
+            return filters
+
+        site_idx = find_col(headers, "SITE")
+        if site_idx is not None:
+            filters.append(("site_filter", "SITE", site_idx))
+
+        status_idx = find_col_from_candidates(headers, ["STATUS", "ESTADO", "STATUS DE LA CAJA"])
+        if status_idx is not None:
+            filters.append(("status_filter", "STATUS", status_idx))
+
         if bitel_partner:
             contrata_idx = find_col(headers, "CONTRATA")
             if contrata_idx is not None:
@@ -552,9 +600,12 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
     headers = data[0]
     rows_all = data[1:]
     rows_all = apply_user_access_filter(rows_all, headers, user_info, selected_tab=selected_tab)
-    coord_idx = find_col(headers, "COORDENADAS")
+    coord_idx, lat_idx, lng_idx = get_coord_indices(headers)
 
-    if selected_tab in BRANCH_TABS:
+    if selected_tab == DEPLOYMENT_TAB:
+        col1_name, col2_name = "BRANCH", "SITE"
+        use_filter2 = True
+    elif selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
         use_filter2 = True
     elif selected_tab == SINGLE_BRANCH_TAB:
@@ -587,18 +638,21 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
 
     if extra_filters:
         extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
-        for param_name, _, col_idx in extra_filter_config:
-            filter_value = (extra_filters.get(param_name) or "").strip()
-            if not filter_value:
-                continue
-            filtered_rows = [
-                r for r in filtered_rows
-                if len(r) > col_idx and matches(r[col_idx], filter_value)
-            ]
+        should_apply_extra_filters = (not (user_info or {}).get("is_admin")) or selected_tab == DEPLOYMENT_TAB
+        if should_apply_extra_filters:
+            for param_name, _, col_idx in extra_filter_config:
+                filter_value = (extra_filters.get(param_name) or "").strip()
+                if not filter_value:
+                    continue
+                filtered_rows = [
+                    r for r in filtered_rows
+                    if len(r) > col_idx and matches(r[col_idx], filter_value)
+                ]
 
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
-    if coord_idx is not None:
-        hidden_idxs.add(coord_idx)
+    for idx in (coord_idx, lat_idx, lng_idx):
+        if idx is not None:
+            hidden_idxs.add(idx)
 
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
     visible_rows = [
@@ -733,6 +787,7 @@ def index():
         "contrata_filter": request.args.get("contrata_filter", "").strip(),
         "reporte_contrata_filter": request.args.get("reporte_contrata_filter", "").strip(),
         "status_caja_filter": request.args.get("status_caja_filter", "").strip(),
+        "status_filter": request.args.get("status_filter", "").strip(),
     }
 
     reset_status = request.args.get("reset_status", "").strip()
@@ -753,7 +808,11 @@ def index():
             selected_filter2 = ""
         else:
             selected_filter1 = user_info.get("branch", "")
-            selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
+            if selected_tab == DEPLOYMENT_TAB:
+                selected_filter2 = ""
+            else:
+                selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
+
 
     elif last_tab != selected_tab:
         selected_filter1 = ""
@@ -767,12 +826,16 @@ def index():
     rows_all = apply_user_access_filter(rows_all, headers, user_info, selected_tab=selected_tab)
     total_rows = len(rows_all)
 
-    coord_idx = find_col(headers, "COORDENADAS")
+    coord_idx, lat_idx, lng_idx = get_coord_indices(headers)
     caja_idx = find_col_exact(headers, "CAJA")
     cuenta_idx = find_col(headers, "CUENTA")
+    status_idx = find_col_from_candidates(headers, ["STATUS", "ESTADO", "STATUS DE LA CAJA"])
 
     # ================= FILTROS =================
-    if selected_tab in BRANCH_TABS:
+    if selected_tab == DEPLOYMENT_TAB:
+        col1_name, col2_name = "BRANCH", "SITE"
+        use_filter2 = True
+    elif selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
         use_filter2 = True
     elif selected_tab == SINGLE_BRANCH_TAB:
@@ -810,7 +873,8 @@ def index():
         )
     ]
     extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
-    if not user_info.get("is_admin"):
+    should_apply_extra_filters = (not user_info.get("is_admin")) or selected_tab == DEPLOYMENT_TAB
+    if should_apply_extra_filters:
         for param_name, _, col_idx in extra_filter_config:
             filter_value = extra_filters.get(param_name, "")
             if not filter_value:
@@ -821,13 +885,16 @@ def index():
             ]
 
     extra_filter_options = []
-    if not user_info.get("is_admin"):
+    should_build_extra_options = (not user_info.get("is_admin")) or selected_tab == DEPLOYMENT_TAB
+    if should_build_extra_options:
         for param_name, label, col_idx in extra_filter_config:
             options = sorted({
                 r[col_idx]
                 for r in rows_after_f1
                 if len(r) > col_idx and r[col_idx].strip()
             })
+            if selected_tab == DEPLOYMENT_TAB and param_name == "contrata_filter" and len(options) <= 1:
+                continue
             extra_filter_options.append({
                 "name": param_name,
                 "label": label,
@@ -849,16 +916,20 @@ def index():
 
     # ================= MAPA =================
     coords_info = []
-    show_map_column = coord_idx is not None and selected_tab not in ["CANCELADOS", SINGLE_BRANCH_TAB]
+    show_map_column = (coord_idx is not None or (lat_idx is not None and lng_idx is not None)) and selected_tab not in ["CANCELADOS", SINGLE_BRANCH_TAB]
 
     if show_map_column:
         cajas_map = {}
 
         for r in filtered_rows:
             try:
-                lat, lng = map(float, r[coord_idx].replace(" ", "").split(",", 1))
-                caja = r[caja_idx].strip().upper() if caja_idx is not None and r[caja_idx] else ""
-                cuenta = r[cuenta_idx] if cuenta_idx is not None else ""
+                coords = get_row_lat_lng(r, coord_idx=coord_idx, lat_idx=lat_idx, lng_idx=lng_idx)
+                if not coords:
+                    continue
+                lat, lng = coords
+                caja = r[caja_idx].strip().upper() if caja_idx is not None and len(r) > caja_idx and r[caja_idx] else ""
+                cuenta = r[cuenta_idx] if cuenta_idx is not None and len(r) > cuenta_idx else ""
+
 
                 if not caja:
                     continue
@@ -872,7 +943,9 @@ def index():
                         "status": ""
                     }
 
-                    if selected_tab == "PENDIENTES ODN" or selected_tab in STATUS_FROM_ODN_TABS:
+                    if selected_tab == DEPLOYMENT_TAB and status_idx is not None and len(r) > status_idx:
+                        cajas_map[caja]["status"] = r[status_idx].strip()
+                    elif selected_tab == "PENDIENTES ODN" or selected_tab in STATUS_FROM_ODN_TABS:
                         estado = estado_cajas.get(caja, "").strip()
                         cajas_map[caja]["status"] = estado if estado else "SIN ESTADO"
 
@@ -893,15 +966,17 @@ def index():
 
     # ================= TABLA =================
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
-    if coord_idx is not None:
-        hidden_idxs.add(coord_idx)
+    for idx in (coord_idx, lat_idx, lng_idx):
+        if idx is not None:
+            hidden_idxs.add(idx)
 
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
 
     rows_with_links = []
     for r in filtered_rows:
         visible_row = [c for i, c in enumerate(r) if i not in hidden_idxs]
-        link = coord_to_link(r[coord_idx]) if coord_idx is not None else None
+        coords = get_row_lat_lng(r, coord_idx=coord_idx, lat_idx=lat_idx, lng_idx=lng_idx)
+        link = f"https://www.google.com/maps?q={coords[0]},{coords[1]}" if coords else None
         rows_with_links.append((visible_row, link))
 
     return render_template(
@@ -927,7 +1002,7 @@ def index():
         user_info=user_info,
         reset_feedback=reset_feedback,
         reset_status=reset_status,
-
+        is_deployment_tab=selected_tab == DEPLOYMENT_TAB,
     )
 
 
@@ -947,6 +1022,7 @@ def export_excel():
         "contrata_filter": request.args.get("contrata_filter", "").strip(),
         "reporte_contrata_filter": request.args.get("reporte_contrata_filter", "").strip(),
         "status_caja_filter": request.args.get("status_caja_filter", "").strip(),
+        "status_filter": request.args.get("status_filter", "").strip(),
     }
 
     user_info = get_session_user_info()
@@ -969,7 +1045,10 @@ def export_excel():
             filter2 = ""
         else:
             filter1 = user_info.get("branch", "")
-            filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
+            if tab == DEPLOYMENT_TAB:
+                filter2 = ""
+            else:
+                filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
 
     headers, rows = get_filtered_data(tab, filter1, filter2, user_info=user_info, extra_filters=extra_filters)
 
@@ -1029,8 +1108,10 @@ def download_excel():
             selected_filter2 = ""
         else:
             selected_filter1 = user_info.get("branch", "")
-            selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
-
+            if selected_tab == DEPLOYMENT_TAB:
+                selected_filter2 = ""
+            else:
+                selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
 
 
     ws = sheet_client.worksheet(selected_tab)
@@ -1039,9 +1120,12 @@ def download_excel():
     rows_all = data[1:]
     rows_all = apply_user_access_filter(rows_all, headers, user_info, selected_tab=selected_tab)
 
-    coord_idx = find_col(headers, "COORDENADAS")
+    coord_idx, lat_idx, lng_idx = get_coord_indices(headers)
 
-    if selected_tab in BRANCH_TABS:
+    if selected_tab == DEPLOYMENT_TAB:
+        col1_name, col2_name = "BRANCH", "SITE"
+        use_filter2 = True
+    elif selected_tab in BRANCH_TABS:
         col1_name, col2_name = "BRANCH", "CONTRATA"
         use_filter2 = True
     elif selected_tab == SINGLE_BRANCH_TAB:
@@ -1070,7 +1154,8 @@ def download_excel():
         r for r in rows_after_f1
         if not (use_filter2 and col2_idx is not None and selected_filter2)
         or (len(r) > col2_idx and matches(r[col2_idx], selected_filter2))    ]
-    if not user_info.get("is_admin"):
+    should_apply_extra_filters = (not user_info.get("is_admin")) or selected_tab == DEPLOYMENT_TAB
+    if should_apply_extra_filters:
         extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
         for param_name, _, col_idx in extra_filter_config:
             filter_value = extra_filters.get(param_name, "")
@@ -1083,8 +1168,9 @@ def download_excel():
 
 
     hidden_idxs = {i for i, h in enumerate(headers) if "LINK" in h.upper()}
-    if coord_idx is not None:
-        hidden_idxs.add(coord_idx)
+    for idx in (coord_idx, lat_idx, lng_idx):
+        if idx is not None:
+            hidden_idxs.add(idx)
 
     visible_headers = [h for i, h in enumerate(headers) if i not in hidden_idxs]
     visible_rows = [
