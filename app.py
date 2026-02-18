@@ -277,6 +277,8 @@ def normalize_key(text):
     without_accents = "".join(ch for ch in normalized if not unicodedata.combining(ch))
     return "".join(ch for ch in without_accents.upper() if ch.isalnum())
 
+def normalize_username_input(value):
+    return (value or "").strip().lower()
 
 USERS = {}
 USERS_SIGNATURE = None
@@ -620,7 +622,7 @@ def login():
     success = "Contraseña actualizada correctamente. Inicia sesión con tu nueva contraseña." if request.args.get("changed") == "1" else None
 
     if request.method == "POST":
-        username = request.form.get("username", "").strip().lower()
+        username = normalize_username_input(request.form.get("username", ""))
         password = request.form.get("password", "").strip()
         user_data = get_users().get(username)
 
@@ -642,7 +644,7 @@ def change_password():
     error = None
 
     if request.method == "POST":
-        username = request.form.get("username", "").strip().lower()
+        username = normalize_username_input(request.form.get("username", ""))
         old_password = request.form.get("old_password", "").strip()
         new_password = request.form.get("new_password", "").strip()
         repeat_new_password = request.form.get("repeat_new_password", "").strip()
@@ -665,6 +667,27 @@ def change_password():
             return redirect(url_for("login", changed="1"))
 
     return render_template("change_password.html", error=error)
+
+@app.route("/admin/reset_password", methods=["POST"])
+def admin_reset_password():
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    user_info = get_session_user_info()
+    if not user_info or not user_info.get("is_admin"):
+        return "No autorizado", 403
+
+    username = normalize_username_input(request.form.get("username", ""))
+    if not username:
+        return redirect(url_for("index", reset_status="invalid"))
+
+    target_user = get_users().get(username)
+    if not target_user:
+        return redirect(url_for("index", reset_status="not_found", reset_user=username))
+
+    was_reset = reset_user_password_override(username)
+    status = "done" if was_reset else "already_default"
+    return redirect(url_for("index", reset_status=status, reset_user=username))
 
 
 @app.route("/logout")
@@ -707,6 +730,18 @@ def index():
         "reporte_contrata_filter": request.args.get("reporte_contrata_filter", "").strip(),
         "status_caja_filter": request.args.get("status_caja_filter", "").strip(),
     }
+
+    reset_status = request.args.get("reset_status", "").strip()
+    reset_user = request.args.get("reset_user", "").strip()
+    reset_feedback = None
+    if reset_status == "done":
+        reset_feedback = f"Reset OK: {reset_user}. Ahora usa la contraseña de STAFF.xlsx"
+    elif reset_status == "already_default":
+        reset_feedback = f"{reset_user} ya estaba usando la contraseña de STAFF.xlsx"
+    elif reset_status == "not_found":
+        reset_feedback = f"Usuario no encontrado: {reset_user}"
+    elif reset_status == "invalid":
+        reset_feedback = "Usuario inválido para reset"
 
     if not user_info.get("is_admin"):
         if has_unfiltered_tab_access(user_info, selected_tab):
@@ -886,6 +921,9 @@ def index():
         extra_filter_options=extra_filter_options,
         estado_cajas=estado_cajas,
         user_info=user_info,
+        reset_feedback=reset_feedback,
+        reset_status=reset_status,
+
     )
 
 

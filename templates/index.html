@@ -136,6 +136,46 @@ select, button{
 }
 
 
+.admin-reset-box{
+    margin:12px 0;
+    padding:10px;
+    background:#fff;
+    border:1px solid #d1d5db;
+    border-radius:6px;
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+
+.admin-reset-box input{
+    padding:6px 10px;
+    border:1px solid #d1d5db;
+    border-radius:4px;
+    min-width:220px;
+}
+
+.feedback{
+    margin:8px 0 12px;
+    padding:8px 10px;
+    border-radius:6px;
+    font-size:13px;
+    border:1px solid;
+}
+
+.feedback.success{
+    color:#065f46;
+    background:#ecfdf5;
+    border-color:#a7f3d0;
+}
+
+.feedback.warn{
+    color:#92400e;
+    background:#fffbeb;
+    border-color:#fcd34d;
+}
+
+
 /* MAP */
 #map-container{
     display:block;
@@ -217,6 +257,22 @@ tr:nth-child(even){
         | Mostrando: <b>{{ filtered_count }}</b>
     {% endif %}
 </div>
+
+{% if reset_feedback %}
+<div class="feedback {% if reset_status in ['done', 'already_default'] %}success{% else %}warn{% endif %}">
+    {{ reset_feedback }}
+</div>
+{% endif %}
+
+{% if user_info.is_admin %}
+<form method="post" action="{{ url_for('admin_reset_password') }}" class="admin-reset-box" onsubmit="return confirmReset(this)">
+    <strong>Reset contraseña (admin):</strong>
+    <input type="text" name="username" placeholder="Usuario objetivo (ej: vtp12345678)" required>
+    <button type="submit">Resetear a STAFF.xlsx</button>
+    <small>Debes ingresar el usuario de la cuenta a resetear, no necesariamente tu usuario admin.</small>
+</form>
+{% endif %}
+
 
 <form method="get" class="filters" id="filterForm" onsubmit="return false;">
 <input type="hidden" name="tab" id="tab_select" value="{{ selected_tab }}">
@@ -554,6 +610,17 @@ function focusCuenta(cuenta){
 </div>
 
 <script>
+
+function confirmReset(form){
+    const input = form.querySelector('input[name="username"]');
+    const target = (input?.value || '').trim().toLowerCase();
+    if(!target){
+        return false;
+    }
+
+    return confirm(`¿Seguro que deseas resetear la contraseña de ${target}?`);
+}
+
 function changeTab(tab){
     document.getElementById("tab_select").value = tab;
     document.getElementById("filterForm").submit();
