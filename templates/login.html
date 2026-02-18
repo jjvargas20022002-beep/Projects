@@ -75,6 +75,38 @@ input:focus {
     border-color: #2563eb;
 }
 
+.password-field {
+    position: relative;
+    margin-top: 12px;
+}
+
+.password-field input {
+    margin-top: 0;
+    padding-right: 46px;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    color: #93c5fd;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    margin: 0;
+}
+
+.toggle-password:hover {
+    color: #bfdbfe;
+    background: transparent;
+}
+
+
 /* BOTÓN */
 button {
     width: 100%;
@@ -130,8 +162,10 @@ button:hover {
     <h2>Acceso WO Pendientes</h2>
 
     <input type="text" name="username" placeholder="Usuario" required>
-    <input type="password" name="password" placeholder="Contraseña" required>
-
+    <div class="password-field">
+    <input id="login_password" type="password" name="password" placeholder="Contraseña" required>
+    <button type="button" class="toggle-password" onclick="togglePassword('login_password', this)" aria-label="Mostrar u ocultar contraseña">👁️</button>
+</div>
     <button type="submit">Ingresar</button>
 
     {% if error %}
@@ -147,6 +181,19 @@ button:hover {
 
 
 </form>
+
+<script>
+function togglePassword(inputId, trigger){
+    const input = document.getElementById(inputId);
+    if(!input){
+        return;
+    }
+
+    const isHidden = input.type === "password";
+    input.type = isHidden ? "text" : "password";
+    trigger.textContent = isHidden ? "🙈" : "👁️";
+}
+</script>
 
 </body>
 </html>
