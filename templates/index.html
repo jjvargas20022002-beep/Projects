@@ -460,6 +460,34 @@ let lastUserLatLng = null;
 /* ============================
    📌 MAPA
    ============================ */
+function getKmlSiteValue(properties){
+    if(!properties){
+        return "";
+    }
+
+    const preferredKeys = ["SITE", "Site", "site", "NOMBRE", "Nombre", "name", "Name"];
+
+    for(const key of preferredKeys){
+        const value = properties[key];
+        if(value !== undefined && value !== null && String(value).trim()){
+            return String(value).trim();
+        }
+    }
+
+    for(const [key, value] of Object.entries(properties)){
+        if(!key || value === undefined || value === null){
+            continue;
+        }
+
+        const normalizedKey = String(key).toLowerCase();
+        if((normalizedKey.includes("site") || normalizedKey.includes("nombre")) && String(value).trim()){
+            return String(value).trim();
+        }
+    }
+
+    return "";
+}
+
 function initMap(){
     if(!map){
         map = L.map("map", {
@@ -475,6 +503,15 @@ function initMap(){
                     weight:2,
                     fillColor:"#3b82f6",
                     fillOpacity:0.25
+                },
+                onEachFeature: function(feature, layer){
+                    const siteValue = getKmlSiteValue((feature || {}).properties || {});
+                    if(!siteValue){
+                        return;
+                    }
+
+                    const content = `<b>Site:</b> ${siteValue}`;
+                    layer.bindPopup(content);
                 }
             })
         ).addTo(map);
