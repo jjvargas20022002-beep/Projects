@@ -496,36 +496,27 @@ function initMap(){
         {match: ["cerrado"], marker: "green", bg: "#1f7a4f", text: "#ffffff", label: "Cerrado"},
     ];
 
-    function getStatusStyle(rawStatus){
+    const tabsConEstado = [
+        "GARANTIAS LIMA",
+        "LI1 TGI",
+        "LI2 DIJUSA",
+        "LI2 ERAM",
+        "LI3 INTER",
+        "LI4 TGI",
+        "LI4 BROKERS",
+        "LI7 MARCOS"
+    ];
+
+
+    const isDeploymentTab = "{{ selected_tab }}" === "DESPLIEGUE";
+    const isCajaStatusTab = tabsConEstado.includes("{{ selected_tab }}") || "{{ selected_tab }}" === "PENDIENTES ODN";
+
+
+    function getDeploymentStatusStyle(rawStatus){
         const normalized = (rawStatus || "").toLowerCase().trim();
-        if(!normalized || normalized === "sin estado"){
-            return {
-                marker: "blue",
-                bg: "#e5e7eb",
-                text: "#111827",
-                label: "",
-                showInPopup: false,
-            };
-        }
+        if(!normalized){
+            return { marker: "blue", bg: "#e5e7eb", text: "#111827", label: "", showInPopup: false };
 
-        if(normalized.includes("reparado")){
-            return {
-                marker: "green",
-                bg: "#18794e",
-                text: "#ffffff",
-                label: rawStatus,
-                showInPopup: true,
-            };
-        }
-
-        if(normalized.includes("no plan")){
-            return {
-                marker: "red",
-                bg: "#b70000",
-                text: "#ffffff",
-                label: rawStatus,
-                showInPopup: true,
-            };
         }
 
         const found = deploymentStatusStyles.find(s =>
@@ -547,12 +538,34 @@ function initMap(){
             showInPopup: true,
         };
     }
+    function getCajaStatusStyle(rawStatus){
+        const normalized = (rawStatus || "").toLowerCase().trim();
+
+        if(!normalized || normalized === "sin estado"){
+            return { marker: "blue", bg: "#e5e7eb", text: "#111827", label: "", showInPopup: false };
+        }
+
+        if(normalized.includes("reparado")){
+            return { marker: "green", bg: "#18794e", text: "#ffffff", label: rawStatus, showInPopup: true };
+        }
+
+        if(normalized.includes("en plan")){
+            return { marker: "yellow", bg: "#f4e6b8", text: "#7c5d00", label: rawStatus, showInPopup: true };
+        }
+
+        if(normalized.includes("no plan")){
+            return { marker: "red", bg: "#b70000", text: "#ffffff", label: rawStatus, showInPopup: true };
+        }
+
+        return { marker: "blue", bg: "#e5e7eb", text: "#111827", label: "", showInPopup: false };
+    }
+
 
 
     coordsInfo.forEach(p=>{
         let icon = ICONS.blue;
         const status = (p.status || "").trim();
-        const statusStyle = getStatusStyle(status);
+        const statusStyle = isDeploymentTab ? getDeploymentStatusStyle(status) : getCajaStatusStyle(status);
 
         if(statusStyle && ICONS[statusStyle.marker]){
             icon = ICONS[statusStyle.marker];
@@ -572,26 +585,15 @@ function initMap(){
             <b>CLIENTES:</b><br>${clientesHTML}
         `;
 
-        const tabsConEstado = [
-            "GARANTIAS LIMA",
-            "LI1 TGI",
-            "LI2 DIJUSA",
-            "LI2 ERAM",
-            "LI3 INTER",
-            "LI4 TGI",
-            "LI4 BROKERS",
-            "LI7 MARCOS"
-        ];
 
 
         const shouldShowStatus = Boolean(statusStyle && statusStyle.showInPopup && statusStyle.label);
 
-        if("{{ selected_tab }}" === "DESPLIEGUE" && shouldShowStatus){
+        if(isDeploymentTab && shouldShowStatus){
             popupHTML += `<br><b>Status:</b>
                 <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${statusStyle.bg};color:${statusStyle.text};font-weight:600;">${statusStyle.label}</span>`;
         } else if(
-            (tabsConEstado.includes("{{ selected_tab }}") ||
-             "{{ selected_tab }}" === "PENDIENTES ODN") &&
+            isCajaStatusTab &&
             shouldShowStatus
         ){
             popupHTML += `<br><b>Estado de la caja:</b> ${statusStyle.label}`;
