@@ -15,8 +15,7 @@ import requests
 from google.auth.transport.requests import Request
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-from time import time
-
+import time
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "secret_key_temporal")
@@ -350,14 +349,14 @@ def refresh_estado_cajas():
                     estado = r[estado_odn_idx].strip()
                     if caja and estado:
                         estado_cajas[caja] = estado
-        ESTADO_CAJAS_LAST_REFRESH = int(time())
+        ESTADO_CAJAS_LAST_REFRESH = int(time.time())
     except Exception:
         estado_cajas = {}
         ESTADO_CAJAS_LAST_REFRESH = 0
 
 
 def ensure_estado_cajas_fresh(force=False):
-    now = int(time())
+    now = int(time.time())
     if force or not estado_cajas or (now - ESTADO_CAJAS_LAST_REFRESH) >= ESTADO_CAJAS_TTL_SECONDS:
         refresh_estado_cajas()
 
@@ -1306,7 +1305,7 @@ def index():
         is_deployment_tab=selected_tab == DEPLOYMENT_TAB,
         update_summary=update_summary,
         user_scope_label=(
-            ""
+            "FBB"
             if user_info.get("is_admin")
             else f"{(user_info.get('branch') or 'N/A')} - {(user_info.get('partner') or 'N/A')}"
         ),
