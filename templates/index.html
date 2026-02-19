@@ -496,10 +496,36 @@ function initMap(){
         {match: ["cerrado"], marker: "green", bg: "#1f7a4f", text: "#ffffff", label: "Cerrado"},
     ];
 
-    function getDeploymentStatusStyle(rawStatus){
+    function getStatusStyle(rawStatus){
         const normalized = (rawStatus || "").toLowerCase().trim();
-        if(!normalized){
-            return null;
+        if(!normalized || normalized === "sin estado"){
+            return {
+                marker: "blue",
+                bg: "#e5e7eb",
+                text: "#111827",
+                label: "",
+                showInPopup: false,
+            };
+        }
+
+        if(normalized.includes("reparado")){
+            return {
+                marker: "green",
+                bg: "#18794e",
+                text: "#ffffff",
+                label: rawStatus,
+                showInPopup: true,
+            };
+        }
+
+        if(normalized.includes("no plan")){
+            return {
+                marker: "red",
+                bg: "#b70000",
+                text: "#ffffff",
+                label: rawStatus,
+                showInPopup: true,
+            };
         }
 
         const found = deploymentStatusStyles.find(s =>
@@ -507,14 +533,18 @@ function initMap(){
         );
 
         if(found){
-            return found;
+            return {
+                ...found,
+                showInPopup: true,
+            };
         }
 
         return {
             marker: "blue",
             bg: "#e5e7eb",
             text: "#111827",
-            label: rawStatus
+            label: rawStatus,
+            showInPopup: true,
         };
     }
 
@@ -522,7 +552,7 @@ function initMap(){
     coordsInfo.forEach(p=>{
         let icon = ICONS.blue;
         const status = (p.status || "").trim();
-        const statusStyle = getDeploymentStatusStyle(status);
+        const statusStyle = getStatusStyle(status);
 
         if(statusStyle && ICONS[statusStyle.marker]){
             icon = ICONS[statusStyle.marker];
@@ -553,16 +583,18 @@ function initMap(){
             "LI7 MARCOS"
         ];
 
-        if("{{ selected_tab }}" === "DESPLIEGUE" && statusStyle){
+
+        const shouldShowStatus = Boolean(statusStyle && statusStyle.showInPopup && statusStyle.label);
+
+        if("{{ selected_tab }}" === "DESPLIEGUE" && shouldShowStatus){
             popupHTML += `<br><b>Status:</b>
                 <span style="display:inline-block;padding:2px 8px;border-radius:999px;background:${statusStyle.bg};color:${statusStyle.text};font-weight:600;">${statusStyle.label}</span>`;
         } else if(
             (tabsConEstado.includes("{{ selected_tab }}") ||
              "{{ selected_tab }}" === "PENDIENTES ODN") &&
-            status
+            shouldShowStatus
         ){
-            popupHTML += `<br><b>Estado de la caja:</b> ${status}`;
-
+            popupHTML += `<br><b>Estado de la caja:</b> ${statusStyle.label}`;
         }
 
         L.marker([p.lat, p.lng], { icon })
