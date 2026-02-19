@@ -627,6 +627,25 @@ def append_password_audit(username):
     with PASSWORD_AUDIT_LOG_PATH.open("a", encoding="utf-8") as f:
         f.write(f"{timestamp}\t{username}\tPASSWORD_CHANGED\n")
 
+def reset_user_password_override(username):
+    username = (username or "").strip().lower()
+    if not username:
+        return False
+
+    overrides = load_password_overrides()
+    if username not in overrides:
+        return False
+
+    overrides.pop(username, None)
+    save_password_overrides(overrides)
+
+    PASSWORD_AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    with PASSWORD_AUDIT_LOG_PATH.open("a", encoding="utf-8") as f:
+        f.write(f"{timestamp}\t{username}\tPASSWORD_RESET_TO_STAFF\n")
+
+    return True
+
 
 def verify_user_password(username, password, user_data=None):
     if not username or not password:
