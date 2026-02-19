@@ -362,7 +362,6 @@ def ensure_estado_cajas_fresh(force=False):
 
 
 
-init_google_sheet()
 
 # =====================
 # CONFIG
