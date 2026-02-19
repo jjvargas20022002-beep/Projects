@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, send_file, jsonify
 import gspread
 from google.oauth2.service_account import Credentials
 import os
@@ -9,8 +9,13 @@ import difflib
 import unicodedata
 import json
 import re
+import hashlib
+import time
+import requests
+from google.auth.transport.requests import Request
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+from time import time
 
 
 app = Flask(__name__)
@@ -24,6 +29,36 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 SHEET_INIT_ERROR = None
 sheet = None
 
+def _get_service_account_info():
+    required_env = [
+        "GCP_PROJECT_ID",
+        "GCP_PRIVATE_KEY_ID",
+        "GCP_PRIVATE_KEY",
+        "GCP_CLIENT_EMAIL",
+        "GCP_CLIENT_ID",
+        "GCP_CLIENT_CERT_URL",
+    ]
+    missing_vars = [var for var in required_env if not os.environ.get(var)]
+    if missing_vars:
+        raise ValueError(f"Faltan variables de entorno: {', '.join(missing_vars)}")
+
+    return {
+        "type": "service_account",
+        "project_id": os.environ["GCP_PROJECT_ID"],
+        "private_key_id": os.environ["GCP_PRIVATE_KEY_ID"],
+        "private_key": os.environ["GCP_PRIVATE_KEY"].replace("\\n", "\n"),
+        "client_email": os.environ["GCP_CLIENT_EMAIL"],
+        "client_id": os.environ["GCP_CLIENT_ID"],
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": os.environ["GCP_CLIENT_CERT_URL"],
+    }
+
+
+def _get_service_account_credentials(scopes):
+    info = _get_service_account_info()
+    return Credentials.from_service_account_info(info, scopes=scopes)
 
 def init_google_sheet():
     global sheet, SHEET_INIT_ERROR
@@ -42,23 +77,8 @@ def init_google_sheet():
         SHEET_INIT_ERROR = f"Faltan variables de entorno: {', '.join(missing_vars)}"
         sheet = None
         return
-
     try:
-        creds = Credentials.from_service_account_info(
-            {
-                "type": "service_account",
-                "project_id": os.environ["GCP_PROJECT_ID"],
-                "private_key_id": os.environ["GCP_PRIVATE_KEY_ID"],
-                "private_key": os.environ["GCP_PRIVATE_KEY"].replace("\\n", "\n"),
-                "client_email": os.environ["GCP_CLIENT_EMAIL"],
-                "client_id": os.environ["GCP_CLIENT_ID"],
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                "client_x509_cert_url": os.environ["GCP_CLIENT_CERT_URL"],
-            },
-            scopes=SCOPES,
-        )
+        creds = _get_service_account_credentials(SCOPES)
         gc = gspread.authorize(creds)
         sheet = gc.open_by_key(os.environ["SPREADSHEET_ID"])
         SHEET_INIT_ERROR = None
@@ -73,14 +93,234 @@ def get_sheet_or_error():
     return sheet, SHEET_INIT_ERROR
 
 
+UPDATE_SUMMARY_CACHE = {
+    "fetched_at": 0.0,
+    "data": None,
+}
+UPDATE_SUMMARY_TTL_SECONDS = int(os.environ.get("UPDATE_SUMMARY_TTL_SECONDS", "45"))
+
+UPDATE_NOTIFIER_STATE_PATH = Path(
+    os.environ.get(
+        "UPDATE_NOTIFIER_STATE_PATH",
+        Path(__file__).resolve().parent / "update_notifier_state.json",
+    )
+)
+FCM_PUSH_ENABLED = os.environ.get("FCM_PUSH_ENABLED", "0") == "1"
+FCM_PROJECT_ID = os.environ.get("FCM_PROJECT_ID", os.environ.get("GCP_PROJECT_ID", "")).strip()
+FCM_TOPIC_AVERIAS = os.environ.get("FCM_TOPIC_AVERIAS", "averias_updates").strip()
+FCM_TOPIC_DESPLIEGUE = os.environ.get("FCM_TOPIC_DESPLIEGUE", "despliegue_updates").strip()
+SCHEDULER_TOKEN = os.environ.get("SCHEDULER_TOKEN", "").strip()
+
+def _build_sheet_fingerprint(values):
+    serialized = json.dumps(values, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def compute_updates_summary(sheet_client):
+    worksheets = sheet_client.worksheets()
+    averias_fingerprints = []
+    despliegue_fingerprint = ""
+
+    for ws in worksheets:
+        title = ws.title
+        values = ws.get_all_values()
+        digest = _build_sheet_fingerprint(values)
+
+        if title == DEPLOYMENT_TAB:
+            despliegue_fingerprint = digest
+        else:
+            averias_fingerprints.append(f"{title}:{digest}")
+
+    averias_joined = "|".join(sorted(averias_fingerprints))
+    averias_digest = hashlib.sha256(averias_joined.encode("utf-8")).hexdigest()
+
+    return {
+        "averias_hash": averias_digest,
+        "despliegue_hash": despliegue_fingerprint,
+        "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    }
+
+
+def get_updates_summary_cached(force_refresh=False):
+    now = time.time()
+    cache_data = UPDATE_SUMMARY_CACHE.get("data")
+    age = now - UPDATE_SUMMARY_CACHE.get("fetched_at", 0.0)
+
+    if not force_refresh and cache_data and age < UPDATE_SUMMARY_TTL_SECONDS:
+        return cache_data
+
+    sheet_client, _ = get_sheet_or_error()
+    if sheet_client is None:
+        fallback = cache_data or {
+            "averias_hash": "",
+            "despliegue_hash": "",
+            "generated_at": "",
+        }
+        return fallback
+
+    summary = compute_updates_summary(sheet_client)
+    UPDATE_SUMMARY_CACHE["fetched_at"] = now
+    UPDATE_SUMMARY_CACHE["data"] = summary
+    return summary
+
+
+def _load_update_notifier_state():
+    if not UPDATE_NOTIFIER_STATE_PATH.exists():
+        return {
+            "averias_hash": "",
+            "despliegue_hash": "",
+            "averias_has_data": False,
+            "despliegue_has_data": False,
+            "generated_at": "",
+        }
+
+    try:
+        with UPDATE_NOTIFIER_STATE_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return {
+            "averias_hash": "",
+            "despliegue_hash": "",
+            "averias_has_data": False,
+            "despliegue_has_data": False,
+            "generated_at": "",
+        }
+
+    if not isinstance(data, dict):
+        return {
+            "averias_hash": "",
+            "despliegue_hash": "",
+            "averias_has_data": False,
+            "despliegue_has_data": False,
+            "generated_at": "",
+        }
+
+    return {
+        "averias_hash": data.get("averias_hash", ""),
+        "despliegue_hash": data.get("despliegue_hash", ""),
+        "averias_has_data": bool(data.get("averias_has_data", False)),
+        "despliegue_has_data": bool(data.get("despliegue_has_data", False)),
+        "generated_at": data.get("generated_at", ""),
+    }
+
+
+def _save_update_notifier_state(summary):
+    UPDATE_NOTIFIER_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "averias_hash": summary.get("averias_hash", ""),
+        "despliegue_hash": summary.get("despliegue_hash", ""),
+        "averias_has_data": bool(summary.get("averias_has_data", False)),
+        "despliegue_has_data": bool(summary.get("despliegue_has_data", False)),
+        "generated_at": summary.get("generated_at", ""),
+    }
+    with UPDATE_NOTIFIER_STATE_PATH.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
+def _send_fcm_topic_message(topic, body_message, data_payload=None):
+    if not FCM_PUSH_ENABLED:
+        return {"sent": False, "reason": "fcm_disabled"}
+
+    if not FCM_PROJECT_ID:
+        return {"sent": False, "reason": "missing_fcm_project_id"}
+
+    if not topic:
+        return {"sent": False, "reason": "missing_topic"}
+
+    try:
+        creds = _get_service_account_credentials(["https://www.googleapis.com/auth/firebase.messaging"])
+        creds.refresh(Request())
+    except Exception as exc:
+        return {"sent": False, "reason": f"token_error:{exc}"}
+
+    payload = {
+        "message": {
+            "topic": topic,
+            "notification": {
+                "title": "Averías FTTH",
+                "body": body_message,
+            },
+            "data": data_payload or {},
+        }
+    }
+
+    try:
+        response = requests.post(
+            f"https://fcm.googleapis.com/v1/projects/{FCM_PROJECT_ID}/messages:send",
+            headers={
+                "Authorization": f"Bearer {creds.token}",
+                "Content-Type": "application/json; charset=UTF-8",
+            },
+            json=payload,
+            timeout=12,
+        )
+    except Exception as exc:
+        return {"sent": False, "reason": f"request_error:{exc}"}
+
+    if response.status_code >= 400:
+        return {
+            "sent": False,
+            "reason": f"http_{response.status_code}",
+            "response": response.text[:350],
+        }
+
+    return {"sent": True}
+
+
+def check_and_send_update_notifications(force_refresh=True):
+    summary = get_updates_summary_cached(force_refresh=force_refresh)
+    previous = _load_update_notifier_state()
+
+    averias_changed = bool(previous.get("averias_hash")) and previous.get("averias_hash") != summary.get("averias_hash")
+    despliegue_changed = bool(previous.get("despliegue_hash")) and previous.get("despliegue_hash") != summary.get("despliegue_hash")
+
+    payload_base = {
+        "generated_at": summary.get("generated_at", ""),
+    }
+
+    results = {
+        "averias": {"triggered": False, "notify": None},
+        "despliegue": {"triggered": False, "notify": None},
+        "summary": summary,
+    }
+
+    if averias_changed:
+        results["averias"]["triggered"] = True
+        results["averias"]["notify"] = _send_fcm_topic_message(
+            FCM_TOPIC_AVERIAS,
+            "Las averías han sido actualizadas.",
+            {
+                **payload_base,
+                "event": "averias_updated",
+            },
+        )
+
+    if despliegue_changed:
+        results["despliegue"]["triggered"] = True
+        results["despliegue"]["notify"] = _send_fcm_topic_message(
+            FCM_TOPIC_DESPLIEGUE,
+            "Los despliegues han sido actualizados.",
+            {
+                **payload_base,
+                "event": "despliegue_updated",
+            },
+        )
+
+    _save_update_notifier_state(summary)
+    return results
+
+
 # =====================
 # ESTADO DE CAJAS DESDE PENDIENTES ODN
 # =====================
 estado_cajas = {}
+ESTADO_CAJAS_LAST_REFRESH = 0
+ESTADO_CAJAS_TTL_SECONDS = int(os.environ.get("ESTADO_CAJAS_TTL_SECONDS", "300"))
+
 
 
 def refresh_estado_cajas():
-    global estado_cajas
+    global estado_cajas, ESTADO_CAJAS_LAST_REFRESH
 
     estado_cajas = {}
 
@@ -110,12 +350,20 @@ def refresh_estado_cajas():
                     estado = r[estado_odn_idx].strip()
                     if caja and estado:
                         estado_cajas[caja] = estado
+        ESTADO_CAJAS_LAST_REFRESH = int(time())
     except Exception:
         estado_cajas = {}
+        ESTADO_CAJAS_LAST_REFRESH = 0
+
+
+def ensure_estado_cajas_fresh(force=False):
+    now = int(time())
+    if force or not estado_cajas or (now - ESTADO_CAJAS_LAST_REFRESH) >= ESTADO_CAJAS_TTL_SECONDS:
+        refresh_estado_cajas()
+
 
 
 init_google_sheet()
-refresh_estado_cajas()
 
 # =====================
 # CONFIG
@@ -780,6 +1028,26 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
+
+@app.route("/api/updates_summary")
+def updates_summary():
+    if "user" not in session:
+        return jsonify({"error": "unauthorized"}), 401
+
+    summary = get_updates_summary_cached(force_refresh=True)
+    return jsonify(summary)
+
+@app.route("/internal/check_updates_notify", methods=["POST"])
+def internal_check_updates_notify():
+    token = request.headers.get("X-Scheduler-Token", "").strip()
+    if not SCHEDULER_TOKEN or token != SCHEDULER_TOKEN:
+        return jsonify({"error": "forbidden"}), 403
+
+    result = check_and_send_update_notifications(force_refresh=True)
+    return jsonify(result)
+
+
+
 # =====================
 # MAIN ROUTE
 # =====================
@@ -945,6 +1213,11 @@ def index():
     coords_info = []
     show_map_column = (coord_idx is not None or (lat_idx is not None and lng_idx is not None)) and selected_tab not in ["CANCELADOS", SINGLE_BRANCH_TAB]
 
+    if selected_tab == "PENDIENTES ODN" or selected_tab in STATUS_FROM_ODN_TABS:
+        ensure_estado_cajas_fresh()
+
+
+
     if show_map_column:
         cajas_map = {}
 
@@ -1005,6 +1278,7 @@ def index():
         coords = get_row_lat_lng(r, coord_idx=coord_idx, lat_idx=lat_idx, lng_idx=lng_idx)
         link = f"https://www.google.com/maps?q={coords[0]},{coords[1]}" if coords else None
         rows_with_links.append((visible_row, link))
+    update_summary = get_updates_summary_cached()
 
     return render_template(
         "index.html",
@@ -1030,6 +1304,7 @@ def index():
         reset_feedback=reset_feedback,
         reset_status=reset_status,
         is_deployment_tab=selected_tab == DEPLOYMENT_TAB,
+        update_summary=update_summary,
         user_scope_label=(
             ""
             if user_info.get("is_admin")

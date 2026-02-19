@@ -246,6 +246,21 @@ tr:nth-child(even){
     font-size:12px;
 }
 
+.update-toast{
+    position:fixed;
+    right:14px;
+    bottom:14px;
+    z-index:2200;
+    background:#111827;
+    color:#fff;
+    border-radius:8px;
+    padding:10px 12px;
+    box-shadow:0 8px 22px rgba(0,0,0,.25);
+    font-size:13px;
+    max-width:320px;
+    display:none;
+}
+
 </style>
 </head>
 
@@ -681,12 +696,90 @@ function focusCuenta(cuenta){
 </table>
 </div>
 
+<div id="updateToast" class="update-toast"></div>
+
 <div class="footer-credit">
     <div><b>Creado por:</b> FBB-Juan Vargas Saldaña</div>
     <div><b>Contacto:</b> +51 917 839 267</div>
 </div>
 
 <script>
+
+const INITIAL_UPDATE_SUMMARY = {{ update_summary|tojson }};
+let lastAveriasHash = INITIAL_UPDATE_SUMMARY?.averias_hash || "";
+let lastDespliegueHash = INITIAL_UPDATE_SUMMARY?.despliegue_hash || "";
+let toastTimer = null;
+
+function showUpdateToast(message){
+    const toast = document.getElementById("updateToast");
+    if(!toast){
+        return;
+    }
+
+    toast.textContent = message;
+    toast.style.display = "block";
+
+    if(toastTimer){
+        clearTimeout(toastTimer);
+    }
+
+    toastTimer = setTimeout(() => {
+        toast.style.display = "none";
+    }, 6000);
+}
+
+function showDesktopNotification(message){
+    if(!("Notification" in window)){
+        return;
+    }
+
+    if(Notification.permission === "granted"){
+        new Notification("Averías FTTH", { body: message });
+        return;
+    }
+
+    if(Notification.permission !== "denied"){
+        Notification.requestPermission();
+    }
+}
+
+async function pollUpdatesSummary(){
+    try{
+        const response = await fetch('/api/updates_summary', {
+            method: 'GET',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+
+        if(!response.ok){
+            return;
+        }
+
+        const data = await response.json();
+        if(!data){
+            return;
+        }
+
+        if(lastAveriasHash && data.averias_hash && data.averias_hash !== lastAveriasHash){
+            const msg = "Se han actualizado las averías, por favor revisar.";
+            showUpdateToast(msg);
+            showDesktopNotification(msg);
+        }
+
+        if(lastDespliegueHash && data.despliegue_hash && data.despliegue_hash !== lastDespliegueHash){
+            const msg = "Se han actualizado los despliegues, por favor revisar.";
+            showUpdateToast(msg);
+            showDesktopNotification(msg);
+        }
+
+        lastAveriasHash = data.averias_hash || lastAveriasHash;
+        lastDespliegueHash = data.despliegue_hash || lastDespliegueHash;
+    } catch (err){
+        console.warn("No se pudo validar actualizaciones:", err);
+    }
+}
+
+window.setInterval(pollUpdatesSummary, 60000);
 
 function confirmReset(form){
     const input = form.querySelector('input[name="username"]');
