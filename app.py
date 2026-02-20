@@ -333,44 +333,23 @@ def _send_fcm_topic_message(topic, body_message, data_payload=None):
 
 
 def check_and_send_update_notifications(force_refresh=True):
+    """Mantiene estado de hashes sin enviar notificaciones push al cliente."""
     summary = get_updates_summary_cached(force_refresh=force_refresh)
-    previous = _load_update_notifier_state()
-
-    averias_changed = bool(previous.get("averias_hash")) and previous.get("averias_hash") != summary.get("averias_hash")
-    despliegue_changed = bool(previous.get("despliegue_hash")) and previous.get("despliegue_hash") != summary.get("despliegue_hash")
-
-    payload_base = {
-        "generated_at": summary.get("generated_at", ""),
-        "last_change_at": summary.get("last_change_at", ""),
-    }
-
+    
     results = {
-        "averias": {"triggered": False, "notify": None},
-        "despliegue": {"triggered": False, "notify": None},
+        "averias": {
+            "triggered": False,
+            "notify": {"sent": False, "reason": "notifications_disabled_by_code"},
+        },
+        "despliegue": {
+            "triggered": False,
+            "notify": {"sent": False, "reason": "notifications_disabled_by_code"},
+        },
+
         "summary": summary,
     }
 
-    if averias_changed:
-        results["averias"]["triggered"] = True
-        results["averias"]["notify"] = _send_fcm_topic_message(
-            FCM_TOPIC_AVERIAS,
-            "Las averías han sido actualizadas.",
-            {
-                **payload_base,
-                "event": "averias_updated",
-            },
-        )
 
-    if despliegue_changed:
-        results["despliegue"]["triggered"] = True
-        results["despliegue"]["notify"] = _send_fcm_topic_message(
-            FCM_TOPIC_DESPLIEGUE,
-            "Los despliegues han sido actualizados.",
-            {
-                **payload_base,
-                "event": "despliegue_updated",
-            },
-        )
 
     _save_update_notifier_state(summary)
     return results
