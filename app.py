@@ -157,14 +157,19 @@ def get_updates_summary_cached(force_refresh=False):
             "generated_at": "",
         }
         return fallback
+    fallback = cache_data or {
+        "averias_hash": "",
+        "despliegue_hash": "",
+        "generated_at": "",
+    }
+
+
 
     try:
         summary = compute_updates_summary(sheet_client)
     except APIError:
         # Si Google Sheets devuelve 429 por cuota, mantener servicio con cache previa.
-        if cache_data:
-            return cache_data
-        raise
+        return fallback
 
     UPDATE_SUMMARY_CACHE["fetched_at"] = now
     UPDATE_SUMMARY_CACHE["data"] = summary
@@ -1090,7 +1095,15 @@ def index():
     if sheet_client is None:
         return f"Error de configuración de Google Sheets: {sheet_error}", 503
 
-    tabs_all = [ws.title for ws in sheet_client.worksheets()]
+    try:
+        tabs_all = [ws.title for ws in sheet_client.worksheets()]
+    except APIError:
+        return (
+            "Google Sheets excedió la cuota de lectura temporalmente (429) al cargar pestañas. "
+            "Vuelve a intentar en unos segundos.",
+            503,
+        )
+
 
     tabs = get_allowed_tabs(tabs_all, user_info)
     if not tabs:
@@ -1139,7 +1152,15 @@ def index():
         selected_filter2 = ""
 
 
-    ws = sheet_client.worksheet(selected_tab)
+    try:
+        ws = sheet_client.worksheet(selected_tab)
+    except APIError:
+        return (
+            "Google Sheets excedió la cuota de lectura temporalmente (429) al abrir la pestaña. "
+            "Vuelve a intentar en unos segundos.",
+            503,
+        )
+
     try:
         data = ws.get_all_values()
     except APIError:
