@@ -155,12 +155,14 @@ def get_updates_summary_cached(force_refresh=False):
             "averias_hash": "",
             "despliegue_hash": "",
             "generated_at": "",
+            "last_change_at": "",
         }
         return fallback
     fallback = cache_data or {
         "averias_hash": "",
         "despliegue_hash": "",
         "generated_at": "",
+        "last_change_at": "",
     }
 
 
@@ -170,6 +172,19 @@ def get_updates_summary_cached(force_refresh=False):
     except APIError:
         # Si Google Sheets devuelve 429 por cuota, mantener servicio con cache previa.
         return fallback
+
+    previous_summary = cache_data or {}
+    had_previous = bool(previous_summary)
+    hashes_changed = (
+        previous_summary.get("averias_hash") != summary.get("averias_hash")
+        or previous_summary.get("despliegue_hash") != summary.get("despliegue_hash")
+    )
+
+    if not had_previous or hashes_changed:
+        summary["last_change_at"] = summary.get("generated_at", "")
+    else:
+        summary["last_change_at"] = previous_summary.get("last_change_at", "")
+
 
     UPDATE_SUMMARY_CACHE["fetched_at"] = now
     UPDATE_SUMMARY_CACHE["data"] = summary
@@ -184,6 +199,7 @@ def _load_update_notifier_state():
             "averias_has_data": False,
             "despliegue_has_data": False,
             "generated_at": "",
+            "last_change_at": "",
         }
 
     try:
@@ -196,6 +212,7 @@ def _load_update_notifier_state():
             "averias_has_data": False,
             "despliegue_has_data": False,
             "generated_at": "",
+            "last_change_at": "",
         }
 
     if not isinstance(data, dict):
@@ -205,6 +222,7 @@ def _load_update_notifier_state():
             "averias_has_data": False,
             "despliegue_has_data": False,
             "generated_at": "",
+            "last_change_at": "",
         }
 
     return {
@@ -213,6 +231,7 @@ def _load_update_notifier_state():
         "averias_has_data": bool(data.get("averias_has_data", False)),
         "despliegue_has_data": bool(data.get("despliegue_has_data", False)),
         "generated_at": data.get("generated_at", ""),
+        "last_change_at": data.get("last_change_at", ""),
     }
 
 
@@ -224,6 +243,7 @@ def _save_update_notifier_state(summary):
         "averias_has_data": bool(summary.get("averias_has_data", False)),
         "despliegue_has_data": bool(summary.get("despliegue_has_data", False)),
         "generated_at": summary.get("generated_at", ""),
+        "last_change_at": summary.get("last_change_at", ""),
     }
     with UPDATE_NOTIFIER_STATE_PATH.open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
@@ -288,6 +308,7 @@ def check_and_send_update_notifications(force_refresh=True):
 
     payload_base = {
         "generated_at": summary.get("generated_at", ""),
+        "last_change_at": summary.get("last_change_at", ""),
     }
 
     results = {

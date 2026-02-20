@@ -782,6 +782,7 @@ function focusCuenta(cuenta){
 <div id="updateToast" class="update-toast"></div>
 
 <div class="footer-credit">
+    <div id="lastUpdateAt"><b>Última actualización:</b> --</div>
     <div><b>Creado por:</b> FBB-Juan Vargas Saldaña</div>
     <div><b>Contacto:</b> <a class="footer-contact-link" href="https://wa.me/51917839267" target="_blank" rel="noopener noreferrer">+51 917 839 267</a></div>
 </div>
@@ -792,6 +793,39 @@ const INITIAL_UPDATE_SUMMARY = {{ update_summary|tojson }};
 let lastAveriasHash = INITIAL_UPDATE_SUMMARY?.averias_hash || "";
 let lastDespliegueHash = INITIAL_UPDATE_SUMMARY?.despliegue_hash || "";
 let toastTimer = null;
+
+function formatUpdateDate(isoValue){
+    if(!isoValue){
+        return "--";
+    }
+
+    const parsed = new Date(isoValue);
+    if(Number.isNaN(parsed.getTime())){
+        return isoValue;
+    }
+
+    return parsed.toLocaleString('es-PE', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+}
+
+function renderLastUpdate(summary){
+    const node = document.getElementById('lastUpdateAt');
+    if(!node){
+        return;
+    }
+
+    const lastValue = summary?.last_change_at || summary?.generated_at || '';
+    node.innerHTML = `<b>Última actualización:</b> ${formatUpdateDate(lastValue)}`;
+}
+
+
 
 function showUpdateToast(message){
     const toast = document.getElementById("updateToast");
@@ -857,11 +891,13 @@ async function pollUpdatesSummary(){
 
         lastAveriasHash = data.averias_hash || lastAveriasHash;
         lastDespliegueHash = data.despliegue_hash || lastDespliegueHash;
+        renderLastUpdate(data);
     } catch (err){
         console.warn("No se pudo validar actualizaciones:", err);
     }
 }
 
+renderLastUpdate(INITIAL_UPDATE_SUMMARY);
 window.setInterval(pollUpdatesSummary, 60000);
 
 function confirmReset(form){
