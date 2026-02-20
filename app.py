@@ -160,6 +160,7 @@ def get_updates_summary_cached(force_refresh=False):
             "generated_at": "",
             "last_change_at": "",
             "total_data_rows": 0,
+            "awaiting_full_restore": False,
         }
         return fallback
     fallback = cache_data or {
@@ -168,6 +169,7 @@ def get_updates_summary_cached(force_refresh=False):
         "generated_at": "",
         "last_change_at": "",
         "total_data_rows": 0,
+        "awaiting_full_restore": False,
     }
 
 
@@ -184,27 +186,27 @@ def get_updates_summary_cached(force_refresh=False):
         or previous_summary.get("despliegue_hash")
     )
 
-    # Evita falsos positivos cuando la hoja queda temporalmente vacía durante una recarga masiva.
+    # Cuando toda la data desaparece temporalmente, marcamos espera de restauración
+    # y conservamos el último timestamp válido.
     if had_previous and summary.get("total_data_rows", 0) == 0:
         stable_summary = {
             **previous_summary,
             "generated_at": summary.get("generated_at", previous_summary.get("generated_at", "")),
             "total_data_rows": summary.get("total_data_rows", 0),
+            "awaiting_full_restore": True,
         }
         UPDATE_SUMMARY_CACHE["fetched_at"] = now
         UPDATE_SUMMARY_CACHE["data"] = stable_summary
         return stable_summary
+    awaiting_full_restore = bool(previous_summary.get("awaiting_full_restore", False))
+    full_restore_detected = awaiting_full_restore and summary.get("total_data_rows", 0) > 0
 
 
-    hashes_changed = (
-        previous_summary.get("averias_hash") != summary.get("averias_hash")
-        or previous_summary.get("despliegue_hash") != summary.get("despliegue_hash")
-    )
-
-    if not had_previous or hashes_changed:
+    if not had_previous or full_restore_detected:
         summary["last_change_at"] = summary.get("generated_at", "")
     else:
         summary["last_change_at"] = previous_summary.get("last_change_at", "")
+    summary["awaiting_full_restore"] = False
 
 
     UPDATE_SUMMARY_CACHE["fetched_at"] = now
@@ -222,6 +224,7 @@ def _load_update_notifier_state():
             "generated_at": "",
             "last_change_at": "",
             "total_data_rows": 0,
+            "awaiting_full_restore": False,
         }
 
     try:
@@ -236,6 +239,7 @@ def _load_update_notifier_state():
             "generated_at": "",
             "last_change_at": "",
             "total_data_rows": 0,
+            "awaiting_full_restore": False,
         }
 
     if not isinstance(data, dict):
@@ -247,6 +251,7 @@ def _load_update_notifier_state():
             "generated_at": "",
             "last_change_at": "",
             "total_data_rows": 0,
+            "awaiting_full_restore": False,
         }
 
     return {
@@ -257,6 +262,7 @@ def _load_update_notifier_state():
         "generated_at": data.get("generated_at", ""),
         "last_change_at": data.get("last_change_at", ""),
         "total_data_rows": int(data.get("total_data_rows", 0) or 0),
+        "awaiting_full_restore": bool(data.get("awaiting_full_restore", False)),
     }
 
 
@@ -270,6 +276,7 @@ def _save_update_notifier_state(summary):
         "generated_at": summary.get("generated_at", ""),
         "last_change_at": summary.get("last_change_at", ""),
         "total_data_rows": int(summary.get("total_data_rows", 0) or 0),
+        "awaiting_full_restore": bool(summary.get("awaiting_full_restore", False)),
     }
     with UPDATE_NOTIFIER_STATE_PATH.open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
