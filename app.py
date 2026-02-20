@@ -120,11 +120,13 @@ def compute_updates_summary(sheet_client):
     worksheets = sheet_client.worksheets()
     averias_fingerprints = []
     despliegue_fingerprint = ""
+    total_data_rows = 0
 
     for ws in worksheets:
         title = ws.title
         values = ws.get_all_values()
         digest = _build_sheet_fingerprint(values)
+        total_data_rows += max(len(values) - 1, 0)
 
         if title == DEPLOYMENT_TAB:
             despliegue_fingerprint = digest
@@ -138,6 +140,7 @@ def compute_updates_summary(sheet_client):
         "averias_hash": averias_digest,
         "despliegue_hash": despliegue_fingerprint,
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "total_data_rows": total_data_rows,
     }
 
 
@@ -156,6 +159,7 @@ def get_updates_summary_cached(force_refresh=False):
             "despliegue_hash": "",
             "generated_at": "",
             "last_change_at": "",
+            "total_data_rows": 0,
         }
         return fallback
     fallback = cache_data or {
@@ -163,6 +167,7 @@ def get_updates_summary_cached(force_refresh=False):
         "despliegue_hash": "",
         "generated_at": "",
         "last_change_at": "",
+        "total_data_rows": 0,
     }
 
 
@@ -173,8 +178,24 @@ def get_updates_summary_cached(force_refresh=False):
         # Si Google Sheets devuelve 429 por cuota, mantener servicio con cache previa.
         return fallback
 
-    previous_summary = cache_data or {}
-    had_previous = bool(previous_summary)
+    previous_summary = cache_data or _load_update_notifier_state()
+    had_previous = bool(
+        previous_summary.get("averias_hash")
+        or previous_summary.get("despliegue_hash")
+    )
+
+    # Evita falsos positivos cuando la hoja queda temporalmente vacía durante una recarga masiva.
+    if had_previous and summary.get("total_data_rows", 0) == 0:
+        stable_summary = {
+            **previous_summary,
+            "generated_at": summary.get("generated_at", previous_summary.get("generated_at", "")),
+            "total_data_rows": summary.get("total_data_rows", 0),
+        }
+        UPDATE_SUMMARY_CACHE["fetched_at"] = now
+        UPDATE_SUMMARY_CACHE["data"] = stable_summary
+        return stable_summary
+
+
     hashes_changed = (
         previous_summary.get("averias_hash") != summary.get("averias_hash")
         or previous_summary.get("despliegue_hash") != summary.get("despliegue_hash")
@@ -200,6 +221,7 @@ def _load_update_notifier_state():
             "despliegue_has_data": False,
             "generated_at": "",
             "last_change_at": "",
+            "total_data_rows": 0,
         }
 
     try:
@@ -213,6 +235,7 @@ def _load_update_notifier_state():
             "despliegue_has_data": False,
             "generated_at": "",
             "last_change_at": "",
+            "total_data_rows": 0,
         }
 
     if not isinstance(data, dict):
@@ -223,6 +246,7 @@ def _load_update_notifier_state():
             "despliegue_has_data": False,
             "generated_at": "",
             "last_change_at": "",
+            "total_data_rows": 0,
         }
 
     return {
@@ -232,6 +256,7 @@ def _load_update_notifier_state():
         "despliegue_has_data": bool(data.get("despliegue_has_data", False)),
         "generated_at": data.get("generated_at", ""),
         "last_change_at": data.get("last_change_at", ""),
+        "total_data_rows": int(data.get("total_data_rows", 0) or 0),
     }
 
 
@@ -244,6 +269,7 @@ def _save_update_notifier_state(summary):
         "despliegue_has_data": bool(summary.get("despliegue_has_data", False)),
         "generated_at": summary.get("generated_at", ""),
         "last_change_at": summary.get("last_change_at", ""),
+        "total_data_rows": int(summary.get("total_data_rows", 0) or 0),
     }
     with UPDATE_NOTIFIER_STATE_PATH.open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
