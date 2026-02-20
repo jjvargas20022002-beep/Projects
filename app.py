@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, jsonify
 import gspread
+from gspread.exceptions import APIError
 from google.oauth2.service_account import Credentials
 import os
 import pandas as pd
@@ -157,7 +158,14 @@ def get_updates_summary_cached(force_refresh=False):
         }
         return fallback
 
-    summary = compute_updates_summary(sheet_client)
+    try:
+        summary = compute_updates_summary(sheet_client)
+    except APIError:
+        # Si Google Sheets devuelve 429 por cuota, mantener servicio con cache previa.
+        if cache_data:
+            return cache_data
+        raise
+
     UPDATE_SUMMARY_CACHE["fetched_at"] = now
     UPDATE_SUMMARY_CACHE["data"] = summary
     return summary
@@ -1051,7 +1059,7 @@ def updates_summary():
     if "user" not in session:
         return jsonify({"error": "unauthorized"}), 401
 
-    summary = get_updates_summary_cached(force_refresh=True)
+    summary = get_updates_summary_cached(force_refresh=False)
     return jsonify(summary)
 
 @app.route("/internal/check_updates_notify", methods=["POST"])
@@ -1132,7 +1140,14 @@ def index():
 
 
     ws = sheet_client.worksheet(selected_tab)
-    data = ws.get_all_values()
+    try:
+        data = ws.get_all_values()
+    except APIError:
+        return (
+            "Google Sheets excedió la cuota de lectura temporalmente (429). "
+            "Vuelve a intentar en unos segundos.",
+            503,
+        )
     headers = data[0]
     rows_all = data[1:]
     rows_all = apply_user_access_filter(rows_all, headers, user_info, selected_tab=selected_tab)
