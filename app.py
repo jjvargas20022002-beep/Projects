@@ -202,7 +202,14 @@ def get_updates_summary_cached(force_refresh=False):
     full_restore_detected = awaiting_full_restore and summary.get("total_data_rows", 0) > 0
 
 
-    if not had_previous or full_restore_detected:
+
+    hashes_changed = (
+        summary.get("averias_hash") != previous_summary.get("averias_hash")
+        or summary.get("despliegue_hash") != previous_summary.get("despliegue_hash")
+    )
+    rows_changed = summary.get("total_data_rows", 0) != previous_summary.get("total_data_rows", 0)
+
+    if not had_previous or full_restore_detected or hashes_changed or rows_changed:
         summary["last_change_at"] = summary.get("generated_at", "")
     else:
         summary["last_change_at"] = previous_summary.get("last_change_at", "")
