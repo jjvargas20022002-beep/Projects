@@ -890,7 +890,10 @@ def get_session_user_info():
 def get_extra_filter_config(headers, selected_tab, user_info=None):
     tab_norm = normalize(selected_tab)
     is_admin = (user_info or {}).get("is_admin")
-    if is_admin and tab_norm != normalize(DEPLOYMENT_TAB):
+    if is_admin and tab_norm not in {
+        normalize(DEPLOYMENT_TAB),
+        normalize("FUERA DE GARANTÍA PROVINCIA"),
+    }:
         return []
 
     bitel_partner = is_partner_branch_wide(user_info)
@@ -962,6 +965,16 @@ def get_extra_filter_config(headers, selected_tab, user_info=None):
 
     return filters
 
+def can_apply_extra_filters(selected_tab, user_info=None):
+    if not (user_info or {}).get("is_admin"):
+        return True
+
+    tab_norm = normalize(selected_tab)
+    return tab_norm in {
+        normalize(DEPLOYMENT_TAB),
+        normalize("FUERA DE GARANTÍA PROVINCIA"),
+    }
+
 # ======================================================
 # FUNCIÓN COMPARTIDA PARA FILTROS
 # ======================================================
@@ -1014,7 +1027,7 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
 
     if extra_filters:
         extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
-        should_apply_extra_filters = (not (user_info or {}).get("is_admin")) or selected_tab == DEPLOYMENT_TAB
+        should_apply_extra_filters = can_apply_extra_filters(selected_tab, user_info=user_info)
         if should_apply_extra_filters:
             for param_name, _, col_idx in extra_filter_config:
                 filter_value = (extra_filters.get(param_name) or "").strip()
@@ -1292,7 +1305,7 @@ def index():
         )
     ]
     extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
-    should_apply_extra_filters = (not user_info.get("is_admin")) or selected_tab == DEPLOYMENT_TAB
+    should_apply_extra_filters = can_apply_extra_filters(selected_tab, user_info=user_info)
     if should_apply_extra_filters:
         for param_name, _, col_idx in extra_filter_config:
             filter_value = extra_filters.get(param_name, "")
@@ -1304,7 +1317,7 @@ def index():
             ]
 
     extra_filter_options = []
-    should_build_extra_options = (not user_info.get("is_admin")) or selected_tab == DEPLOYMENT_TAB
+    should_build_extra_options = can_apply_extra_filters(selected_tab, user_info=user_info)
     if should_build_extra_options:
         for param_name, label, col_idx in extra_filter_config:
             options = sorted({
@@ -1588,7 +1601,7 @@ def download_excel():
         r for r in rows_after_f1
         if not (use_filter2 and col2_idx is not None and selected_filter2)
         or (len(r) > col2_idx and matches(r[col2_idx], selected_filter2))    ]
-    should_apply_extra_filters = (not user_info.get("is_admin")) or selected_tab == DEPLOYMENT_TAB
+    should_apply_extra_filters = can_apply_extra_filters(selected_tab, user_info=user_info)
     if should_apply_extra_filters:
         extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
         for param_name, _, col_idx in extra_filter_config:
