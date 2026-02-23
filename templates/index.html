@@ -349,14 +349,6 @@ Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
 {% endfor %}
 </select>
 
-{% for extra_filter in extra_filter_options %}
-<select name="{{ extra_filter.name }}" onchange="this.form.submit()">
-<option value="">{{ extra_filter.label }}</option>
-{% for option in extra_filter.options %}
-<option value="{{ option }}" {% if option == extra_filter.selected %}selected{% endif %}>{{ option }}</option>
-{% endfor %}
-</select>
-{% endfor %}
 
 {% elif selected_tab == "ONLINE LIMA" %}
 <select name="filter1" onchange="this.form.submit()">
@@ -396,6 +388,16 @@ Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
 {% endfor %}
 </select>
 {% endif %}
+
+{% for extra_filter in extra_filter_options %}
+<select name="{{ extra_filter.name }}" onchange="this.form.submit()">
+<option value="">{{ extra_filter.label }}</option>
+{% for option in extra_filter.options %}
+<option value="{{ option }}" {% if option == extra_filter.selected %}selected{% endif %}>{{ option }}</option>
+{% endfor %}
+</select>
+{% endfor %}
+
 {% endif %}
 
 <!-- BOTÓN DESCARGA EXCEL (CORRECTO CON FLASK) -->
