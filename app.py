@@ -98,6 +98,9 @@ UPDATE_SUMMARY_CACHE = {
     "data": None,
 }
 UPDATE_SUMMARY_TTL_SECONDS = int(os.environ.get("UPDATE_SUMMARY_TTL_SECONDS", "45"))
+UPDATE_MIN_TABS_WITH_ROW_CHANGES = int(os.environ.get("UPDATE_MIN_TABS_WITH_ROW_CHANGES", "3"))
+
+
 
 UPDATE_NOTIFIER_STATE_PATH = Path(
     os.environ.get(
@@ -121,12 +124,15 @@ def compute_updates_summary(sheet_client):
     averias_fingerprints = []
     despliegue_fingerprint = ""
     total_data_rows = 0
+    tab_row_counts = {}
 
     for ws in worksheets:
         title = ws.title
         values = ws.get_all_values()
         digest = _build_sheet_fingerprint(values)
-        total_data_rows += max(len(values) - 1, 0)
+        row_count = max(len(values) - 1, 0)
+        tab_row_counts[title] = row_count
+        total_data_rows += row_count
 
         if title == DEPLOYMENT_TAB:
             despliegue_fingerprint = digest
@@ -141,6 +147,7 @@ def compute_updates_summary(sheet_client):
         "despliegue_hash": despliegue_fingerprint,
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "total_data_rows": total_data_rows,
+        "tab_row_counts": tab_row_counts,
     }
 
 
@@ -160,6 +167,8 @@ def get_updates_summary_cached(force_refresh=False):
             "generated_at": "",
             "last_change_at": "",
             "total_data_rows": 0,
+            "tab_row_counts": {},
+            "tabs_with_row_changes": 0,
             "awaiting_full_restore": False,
         }
         return fallback
@@ -169,6 +178,8 @@ def get_updates_summary_cached(force_refresh=False):
         "generated_at": "",
         "last_change_at": "",
         "total_data_rows": 0,
+        "tab_row_counts": {},
+        "tabs_with_row_changes": 0,
         "awaiting_full_restore": False,
     }
 
@@ -203,13 +214,23 @@ def get_updates_summary_cached(force_refresh=False):
 
 
 
-    hashes_changed = (
-        summary.get("averias_hash") != previous_summary.get("averias_hash")
-        or summary.get("despliegue_hash") != previous_summary.get("despliegue_hash")
+    previous_tab_rows = previous_summary.get("tab_row_counts", {})
+    current_tab_rows = summary.get("tab_row_counts", {})
+    tabs_to_compare = set(previous_tab_rows.keys()) | set(current_tab_rows.keys())
+    tabs_with_row_changes = sum(
+        1
+        for tab_name in tabs_to_compare
+        if int(current_tab_rows.get(tab_name, 0) or 0) != int(previous_tab_rows.get(tab_name, 0) or 0)
     )
-    rows_changed = summary.get("total_data_rows", 0) != previous_summary.get("total_data_rows", 0)
+    summary["tabs_with_row_changes"] = tabs_with_row_changes
 
-    if not had_previous or full_restore_detected or hashes_changed or rows_changed:
+    should_update_last_change_at = (
+        not had_previous
+        or full_restore_detected
+        or tabs_with_row_changes >= UPDATE_MIN_TABS_WITH_ROW_CHANGES
+    )
+
+    if should_update_last_change_at:
         summary["last_change_at"] = summary.get("generated_at", "")
     else:
         summary["last_change_at"] = previous_summary.get("last_change_at", "")
@@ -231,6 +252,8 @@ def _load_update_notifier_state():
             "generated_at": "",
             "last_change_at": "",
             "total_data_rows": 0,
+            "tab_row_counts": {},
+            "tabs_with_row_changes": 0,
             "awaiting_full_restore": False,
         }
 
@@ -246,6 +269,8 @@ def _load_update_notifier_state():
             "generated_at": "",
             "last_change_at": "",
             "total_data_rows": 0,
+            "tab_row_counts": {},
+            "tabs_with_row_changes": 0,
             "awaiting_full_restore": False,
         }
 
@@ -258,6 +283,8 @@ def _load_update_notifier_state():
             "generated_at": "",
             "last_change_at": "",
             "total_data_rows": 0,
+            "tab_row_counts": {},
+            "tabs_with_row_changes": 0,
             "awaiting_full_restore": False,
         }
 
@@ -269,6 +296,8 @@ def _load_update_notifier_state():
         "generated_at": data.get("generated_at", ""),
         "last_change_at": data.get("last_change_at", ""),
         "total_data_rows": int(data.get("total_data_rows", 0) or 0),
+        "tab_row_counts": data.get("tab_row_counts", {}) if isinstance(data.get("tab_row_counts", {}), dict) else {},
+        "tabs_with_row_changes": int(data.get("tabs_with_row_changes", 0) or 0),
         "awaiting_full_restore": bool(data.get("awaiting_full_restore", False)),
     }
 
@@ -283,6 +312,8 @@ def _save_update_notifier_state(summary):
         "generated_at": summary.get("generated_at", ""),
         "last_change_at": summary.get("last_change_at", ""),
         "total_data_rows": int(summary.get("total_data_rows", 0) or 0),
+        "tab_row_counts": summary.get("tab_row_counts", {}) if isinstance(summary.get("tab_row_counts", {}), dict) else {},
+        "tabs_with_row_changes": int(summary.get("tabs_with_row_changes", 0) or 0),
         "awaiting_full_restore": bool(summary.get("awaiting_full_restore", False)),
     }
     with UPDATE_NOTIFIER_STATE_PATH.open("w", encoding="utf-8") as f:
