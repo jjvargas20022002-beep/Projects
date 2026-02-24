@@ -42,25 +42,26 @@ body{
     background:#ffffff;
     border-bottom:1px solid #e5e7eb;
     padding:12px 20px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
 }
 
-.header h1{
+.header-title{
     margin:0;
     font-size:18px;
     font-weight:600;
+    line-height:1.2;
 }
 
 .header-right{
     display:flex;
     align-items:center;
     gap:12px;
+    margin-top:8px;
+    flex-wrap:wrap;
 }
 
 .header-right img{
     height:32px;
+    width:auto;
 }
 
 .user-scope-badge{
@@ -72,6 +73,10 @@ body{
     padding:4px 8px;
     white-space:nowrap;
     min-height:18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
 }
 
 .logout{
@@ -273,16 +278,57 @@ tr:nth-child(even){
     display:none;
 }
 
+@media (max-width: 768px){
+    .header{
+        padding:10px 12px;
+    }
+
+    .header-title{
+        font-size:16px;
+    }
+
+    .header-right{
+        display:grid;
+        grid-template-columns: minmax(0,1fr) auto auto;
+        align-items:center;
+        column-gap:8px;
+        row-gap:8px;
+        width:100%;
+    }
+
+    .user-scope-badge{
+        min-width:0;
+        white-space:normal;
+        line-height:1.2;
+    }
+
+    .header-right img{
+        height:28px;
+    }
+
+    .logout{
+        padding:6px 8px;
+        font-size:12px;
+        line-height:1.1;
+    }
+
+    .tabs,
+    .container{
+        padding-left:12px;
+        padding-right:12px;
+    }
+}
+
 </style>
 </head>
 
 <body>
 
 <div class="header">
-    <h1>Averías/Despliegues FTTH</h1>
+    <h1 class="header-title">Averías/Despliegues FTTH</h1>
     <div class="header-right">
         <span class="user-scope-badge">{{ user_scope_label }}</span>
-        <img src="{{ url_for('static', filename='bitel.png') }}">
+        <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
         <a href="/logout"><button class="logout">Cerrar sesión</button></a>
     </div>
 </div>
