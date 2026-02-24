@@ -435,9 +435,7 @@ def check_and_send_update_notifications(force_refresh=True):
     return results
 
 
-
-
-# =====================
+# ======================
 # ESTADO DE CAJAS DESDE PENDIENTES ODN
 # =====================
 estado_cajas = {}
