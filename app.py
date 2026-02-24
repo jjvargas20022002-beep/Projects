@@ -371,19 +371,61 @@ def _send_fcm_topic_message(topic, body_message, data_payload=None):
 
 
 def check_and_send_update_notifications(force_refresh=True):
-    """Mantiene estado de hashes sin enviar notificaciones push al cliente."""
+    """Detecta cambios reales en la data y dispara push FCM desde backend."""
+    previous_state = _load_update_notifier_state()
     summary = get_updates_summary_cached(force_refresh=force_refresh)
-    
+
+    previous_last_change_at = previous_state.get("last_change_at", "")
+    current_last_change_at = summary.get("last_change_at", "")
+    has_real_change = bool(current_last_change_at and current_last_change_at != previous_last_change_at)
+
+    averias_changed = (
+        bool(summary.get("averias_hash"))
+        and summary.get("averias_hash") != previous_state.get("averias_hash", "")
+        and has_real_change
+    )
+    despliegue_changed = (
+        bool(summary.get("despliegue_hash"))
+        and summary.get("despliegue_hash") != previous_state.get("despliegue_hash", "")
+        and has_real_change
+    )
+
+    body_message = f"Información actualizada ({current_last_change_at})"
+
+    averias_notify = {"sent": False, "reason": "no_change"}
+    if averias_changed:
+        averias_notify = _send_fcm_topic_message(
+            topic=FCM_TOPIC_AVERIAS,
+            body_message=body_message,
+            data_payload={
+                "type": "updates_summary",
+                "segment": "averias",
+                "last_change_at": current_last_change_at,
+            },
+        )
+
+    despliegue_notify = {"sent": False, "reason": "no_change"}
+    if despliegue_changed:
+        despliegue_notify = _send_fcm_topic_message(
+            topic=FCM_TOPIC_DESPLIEGUE,
+            body_message=body_message,
+            data_payload={
+                "type": "updates_summary",
+                "segment": "despliegue",
+                "last_change_at": current_last_change_at,
+            },
+        )
+
     results = {
         "averias": {
-            "triggered": False,
-            "notify": {"sent": False, "reason": "notifications_disabled_by_code"},
+            "triggered": averias_changed,
+            "notify": averias_notify,
         },
         "despliegue": {
-            "triggered": False,
-            "notify": {"sent": False, "reason": "notifications_disabled_by_code"},
+            "triggered": despliegue_changed,
+            "notify": despliegue_notify,
         },
-
+        "last_change_at_changed": has_real_change,
         "summary": summary,
     }
 
@@ -391,6 +433,8 @@ def check_and_send_update_notifications(force_refresh=True):
 
     _save_update_notifier_state(summary)
     return results
+
+
 
 
 # =====================
