@@ -1184,6 +1184,10 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
+@app.route("/healthz")
+def healthz():
+    return jsonify({"status": "ok"}), 200
+
 
 @app.route("/api/updates_summary")
 def updates_summary():
