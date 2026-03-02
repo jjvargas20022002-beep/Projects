@@ -791,7 +791,6 @@ def obtener_resultado_estado(df_tms, site, olt, box):
 
     estados = []
     ips = []
-    for _, row in df_filtrado.iterrows():
     lookups = 0
     with requests.Session() as http_session:
         for _, row in df_filtrado.iterrows():
