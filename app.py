@@ -574,6 +574,12 @@ PORT_VALIDATION_BRAS_ENDPOINT = os.environ.get(
     "http://10.121.62.102:8080/backup/cgi-bin/bras_checkuser/bras_checkkick_online.php",
 ).strip()
 PORT_VALIDATION_STATE_KEY = "port_validation_state"
+PORT_VALIDATION_BRAS_TIMEOUT_SECONDS = float(os.environ.get("PORT_VALIDATION_BRAS_TIMEOUT_SECONDS", "2.5"))
+PORT_VALIDATION_BRAS_COOLDOWN_SECONDS = int(os.environ.get("PORT_VALIDATION_BRAS_COOLDOWN_SECONDS", "90"))
+PORT_VALIDATION_MAX_BRAS_LOOKUPS = int(os.environ.get("PORT_VALIDATION_MAX_BRAS_LOOKUPS", "80"))
+BRAS_UNREACHABLE_UNTIL = 0.0
+
+
 
 
 # =====================
@@ -662,6 +668,7 @@ def query_nims_infra_rows(spreadsheet, infra_value):
     return {"headers": headers, "rows": rows}, None
 
 
+
 def _cell_from_row(row, idx=None, key=None, default=""):
     if key and key in row:
         return str(row.get(key, default) or default)
@@ -732,7 +739,12 @@ def extraer_info(texto):
     return estado, ip_status
 
 
-def consultar_estado_en_bras(username, bras):
+def consultar_estado_en_bras(username, bras, http_session=None):
+    global BRAS_UNREACHABLE_UNTIL
+
+    now = time.time()
+    if now < BRAS_UNREACHABLE_UNTIL:
+        return "ERROR", "IP NOK"
     params = {
         "cat": "view",
         "acc": (username or "").strip(),
@@ -741,7 +753,13 @@ def consultar_estado_en_bras(username, bras):
     }
 
     try:
-        response = requests.get(PORT_VALIDATION_BRAS_ENDPOINT, params=params, timeout=7)
+        requester = http_session or requests
+        response = requester.get(
+            PORT_VALIDATION_BRAS_ENDPOINT,
+            params=params,
+            timeout=PORT_VALIDATION_BRAS_TIMEOUT_SECONDS,
+        )
+
         if response.status_code != 200:
             return "ERROR", "IP NOK"
 
@@ -750,6 +768,9 @@ def consultar_estado_en_bras(username, bras):
         text = re.sub(r"<[^>]+>", " ", cleaned)
         text = re.sub(r"\s+", " ", text).strip()
         return extraer_info(text)
+    except requests.exceptions.RequestException:
+        BRAS_UNREACHABLE_UNTIL = now + PORT_VALIDATION_BRAS_COOLDOWN_SECONDS
+        return "ERROR", "IP NOK"
     except Exception:
         return "ERROR", "IP NOK"
 
@@ -771,11 +792,21 @@ def obtener_resultado_estado(df_tms, site, olt, box):
     estados = []
     ips = []
     for _, row in df_filtrado.iterrows():
-        username = _cell_from_row(row, idx=1, key="USERNAME")
-        bras = _cell_from_row(row, key="BRAS")
-        estado, ip_status = consultar_estado_en_bras(username, bras)
-        estados.append(estado)
-        ips.append(ip_status)
+    lookups = 0
+    with requests.Session() as http_session:
+        for _, row in df_filtrado.iterrows():
+            username = _cell_from_row(row, idx=1, key="USERNAME")
+            bras = _cell_from_row(row, key="BRAS")
+
+            if lookups >= PORT_VALIDATION_MAX_BRAS_LOOKUPS:
+                estado, ip_status = "ERROR", "IP NOK"
+            else:
+                estado, ip_status = consultar_estado_en_bras(username, bras, http_session=http_session)
+                lookups += 1
+
+            estados.append(estado)
+            ips.append(ip_status)
+
 
     resultado = pd.DataFrame({
         "USERNAME": df_filtrado.apply(lambda r: _cell_from_row(r, idx=1, key="USERNAME"), axis=1),
