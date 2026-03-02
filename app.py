@@ -16,7 +16,7 @@ import requests
 from google.auth.transport.requests import Request
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-import time
+from jinja2 import TemplateNotFound
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "secret_key_temporal")
@@ -160,6 +160,7 @@ def compute_updates_summary(sheet_client):
         averias_digest_builder.update(averias_fingerprints_by_title[title].encode("utf-8"))
         averias_digest_builder.update(b"|")
     averias_digest = averias_digest_builder.hexdigest()
+
 
 
     return {
@@ -1622,6 +1623,7 @@ def index():
             filtered_rows.append(r)
 
 
+
     extra_filter_options = []
     if should_apply_extra_filters:
         for param_name, label, _ in extra_filter_config:
@@ -1866,20 +1868,31 @@ def port_validation():
             "rows": [[str(v) for v in row] for row in df.fillna("").values.tolist()],
         }
 
-    return render_template(
-        "port_validation.html",
-        user_info=user_info,
-        site=site,
-        box=box,
-        olt=olt,
-        olt_options=PORT_VALIDATION_OLTS,
-        infra_value=infra_value,
-        infra_table=to_table_payload(infra_table),
-        estado_table=to_table_payload(estado_table),
-        diferencias_table=to_table_payload(diferencias_table),
-        error_message=error,
-        info_message=info,
-    )
+    template_context = {
+        "user_info": user_info,
+        "site": site,
+        "box": box,
+        "olt": olt,
+        "olt_options": PORT_VALIDATION_OLTS,
+        "infra_value": infra_value,
+        "infra_table": to_table_payload(infra_table),
+        "estado_table": to_table_payload(estado_table),
+        "diferencias_table": to_table_payload(diferencias_table),
+        "error_message": error,
+        "info_message": info,
+    }
+
+    try:
+        return render_template("port_validation.html", **template_context)
+    except TemplateNotFound:
+        # Fallback defensivo para evitar 500 si el template no está disponible
+        # en el entorno de despliegue por un problema de packaging/sync.
+        return (
+            "No se encontró la plantilla 'port_validation.html' en el servidor. "
+            "Verifica que exista en la carpeta templates/ del deploy.",
+            503,
+        )
+
 
 
 @app.route("/export_excel")
