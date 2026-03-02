@@ -56,6 +56,125 @@ body{
     line-height:1.2;
 }
 
+.header-title-wrap{
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+.header-menu{
+    position:relative;
+}
+
+.header-menu-toggle{
+    border:none;
+    background:transparent;
+    color:#1f2937;
+    font-size:16px;
+    line-height:1;
+    padding:2px 4px;
+    cursor:pointer;
+}
+
+.header-menu-list{
+    position:absolute;
+    top:100%;
+    left:0;
+    margin-top:6px;
+    min-width:180px;
+    background:#ffffff;
+    border:1px solid #d1d5db;
+    border-radius:6px;
+    box-shadow:0 8px 18px rgba(0,0,0,.15);
+    display:none;
+    z-index:1500;
+}
+
+.header-menu.open .header-menu-list{
+    display:block;
+}
+
+.header-menu-link{
+    display:block;
+    width:100%;
+    text-align:left;
+    border:none;
+    background:#ffffff;
+    padding:8px 10px;
+    color:#1f2937;
+    text-decoration:none;
+    font-size:13px;
+    cursor:pointer;
+}
+
+.header-menu-link:hover{
+    background:#f3f4f6;
+}
+
+.header-menu-link + .header-menu-link{
+    border-top:1px solid #e5e7eb;
+}
+
+.embed-panel{
+    position:fixed;
+    inset:0;
+    z-index:2600;
+    background:rgba(15,23,42,.65);
+    display:none;
+    align-items:stretch;
+    justify-content:center;
+    padding:18px;
+}
+
+.embed-panel.open{
+    display:flex;
+}
+
+.embed-panel-card{
+    width:min(1200px, 100%);
+    height:min(88vh, 100%);
+    background:#ffffff;
+    border-radius:8px;
+    overflow:hidden;
+    box-shadow:0 18px 40px rgba(0,0,0,.28);
+    display:flex;
+    flex-direction:column;
+}
+
+.embed-panel-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:10px 12px;
+    border-bottom:1px solid #e5e7eb;
+    background:#f8fafc;
+}
+
+.embed-panel-actions{
+    display:flex;
+    gap:8px;
+}
+
+.embed-panel-btn{
+    border:1px solid #d1d5db;
+    background:#fff;
+    color:#111827;
+    border-radius:6px;
+    padding:6px 9px;
+    font-size:12px;
+    text-decoration:none;
+    cursor:pointer;
+}
+
+.embed-panel-frame{
+    border:none;
+    width:100%;
+    height:100%;
+    flex:1;
+}
+
+
 .header-right{
     display:flex;
     align-items:center;
@@ -334,11 +453,40 @@ tr:nth-child(even){
 <body>
 
 <div class="header">
-    <h1 class="header-title">Averías/Despliegues FTTH</h1>
+    <div class="header-title-wrap">
+        <h1 class="header-title">Averías/Despliegues FTTH</h1>
+        <div class="header-menu" id="headerMenu">
+            <button class="header-menu-toggle" type="button" aria-label="Abrir menú" aria-expanded="false" onclick="toggleHeaderMenu(event)">▾</button>
+            <div class="header-menu-list">
+                <button class="header-menu-link" type="button" onclick="openPortValidationInApp(event)">Validación de puertos (en app)</button>
+                <a class="header-menu-link" href="https://port_validation.tickt.site/" target="_blank" rel="noopener noreferrer">Validación de puertos (web)</a>
+            </div>
+        </div>
+    </div>
     <div class="header-right">
         <span class="user-scope-badge">{{ user_scope_label }}</span>
         <img src="{{ url_for('static', filename='bitel.png') }}" alt="Bitel">
         <a href="/logout"><button class="logout">Cerrar sesión</button></a>
+    </div>
+</div>
+
+<div class="embed-panel" id="portValidationPanel" aria-hidden="true">
+    <div class="embed-panel-card">
+        <div class="embed-panel-header">
+            <strong>Validación de puertos</strong>
+            <div class="embed-panel-actions">
+                <a class="embed-panel-btn" href="https://port_validation.tickt.site/" target="_blank" rel="noopener noreferrer">Abrir en pestaña</a>
+                <button class="embed-panel-btn" type="button" onclick="closePortValidationPanel()">Volver a Averías/Despliegues FTTH</button>
+            </div>
+        </div>
+        <iframe
+            class="embed-panel-frame"
+            id="portValidationFrame"
+            title="Validación de puertos"
+            src="about:blank"
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade">
+        </iframe>
     </div>
 </div>
 
@@ -846,6 +994,87 @@ function focusCuenta(cuenta){
 <script>
 
 const INITIAL_UPDATE_SUMMARY = {{ update_summary|tojson }};
+
+function toggleHeaderMenu(event){
+    event.stopPropagation();
+    const menu = document.getElementById('headerMenu');
+    if(!menu){
+        return;
+    }
+
+    const isOpen = menu.classList.toggle('open');
+    const button = menu.querySelector('.header-menu-toggle');
+    if(button){
+        button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
+}
+
+document.addEventListener('click', function(){
+    const menu = document.getElementById('headerMenu');
+    if(!menu){
+        return;
+    }
+
+    menu.classList.remove('open');
+    const button = menu.querySelector('.header-menu-toggle');
+    if(button){
+        button.setAttribute('aria-expanded', 'false');
+    }
+});
+
+function openPortValidationInApp(event){
+    event.stopPropagation();
+
+    const menu = document.getElementById('headerMenu');
+    if(menu){
+        menu.classList.remove('open');
+        const button = menu.querySelector('.header-menu-toggle');
+        if(button){
+            button.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    const panel = document.getElementById('portValidationPanel');
+    const frame = document.getElementById('portValidationFrame');
+    if(!panel || !frame){
+        window.location.href = 'https://port_validation.tickt.site/';
+        return;
+    }
+
+    frame.src = 'https://port_validation.tickt.site/';
+    panel.classList.add('open');
+    panel.setAttribute('aria-hidden', 'false');
+}
+
+document.addEventListener('keydown', function(event){
+    if(event.key === 'Escape'){
+        closePortValidationPanel();
+    }
+});
+
+document.addEventListener('click', function(event){
+    const panel = document.getElementById('portValidationPanel');
+    if(!panel || !panel.classList.contains('open')){
+        return;
+    }
+
+    const card = panel.querySelector('.embed-panel-card');
+    if(card && !card.contains(event.target)){
+        closePortValidationPanel();
+    }
+});
+
+function closePortValidationPanel(){
+    const panel = document.getElementById('portValidationPanel');
+    const frame = document.getElementById('portValidationFrame');
+    if(!panel || !frame){
+        return;
+    }
+
+    panel.classList.remove('open');
+    panel.setAttribute('aria-hidden', 'true');
+    frame.src = 'about:blank';
+}
 
 
 function formatUpdateDate(isoValue){
