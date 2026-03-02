@@ -115,13 +115,28 @@ FCM_TOPIC_DESPLIEGUE = os.environ.get("FCM_TOPIC_DESPLIEGUE", "despliegue_update
 SCHEDULER_TOKEN = os.environ.get("SCHEDULER_TOKEN", "").strip()
 
 def _build_sheet_fingerprint(values):
-    serialized = json.dumps(values, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+    """Calcula un hash estable sin materializar una copia gigante en memoria.
+
+    La versión anterior usaba json.dumps(values), lo que duplicaba temporalmente
+    la data completa de cada pestaña como un único string grande.
+    """
+    digest = hashlib.sha256()
+    row_sep = "\x1e".encode("utf-8")
+    col_sep = "\x1f".encode("utf-8")
+
+    for row in values:
+        for cell in row:
+            digest.update(str(cell).encode("utf-8"))
+            digest.update(col_sep)
+        digest.update(row_sep)
+
+    return digest.hexdigest()
+
 
 
 def compute_updates_summary(sheet_client):
     worksheets = sheet_client.worksheets()
-    averias_fingerprints = []
+    averias_fingerprints_by_title = {}
     despliegue_fingerprint = ""
     total_data_rows = 0
     tab_row_counts = {}
@@ -137,10 +152,16 @@ def compute_updates_summary(sheet_client):
         if title == DEPLOYMENT_TAB:
             despliegue_fingerprint = digest
         else:
-            averias_fingerprints.append(f"{title}:{digest}")
+            averias_fingerprints_by_title[title] = digest
 
-    averias_joined = "|".join(sorted(averias_fingerprints))
-    averias_digest = hashlib.sha256(averias_joined.encode("utf-8")).hexdigest()
+    averias_digest_builder = hashlib.sha256()
+    for title in sorted(averias_fingerprints_by_title):
+        averias_digest_builder.update(title.encode("utf-8"))
+        averias_digest_builder.update(b":")
+        averias_digest_builder.update(averias_fingerprints_by_title[title].encode("utf-8"))
+        averias_digest_builder.update(b"|")
+    averias_digest = averias_digest_builder.hexdigest()
+
 
     return {
         "averias_hash": averias_digest,
