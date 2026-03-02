@@ -617,6 +617,50 @@ def worksheet_to_dataframe(spreadsheet, worksheet_title):
 
     return pd.DataFrame(normalized_rows, columns=padded_headers)
 
+def query_nims_infra_rows(spreadsheet, infra_value):
+    """Consulta NIMS sin cargar toda la hoja a memoria.
+
+    Lee únicamente las columnas necesarias para mostrar INFRA y usa la
+    columna I (índice 8) para filtrar coincidencias.
+    """
+    ws = spreadsheet.worksheet("NIMS")
+    ranges = ["A:A", "B:B", "E:E", "H:H", "I:I", "K:K", "T:T"]
+    columns = ws.batch_get(ranges)
+
+    if not columns or any(not isinstance(col, list) or len(col) < 1 for col in columns):
+        return None, "La hoja NIMS no tiene datos o no se pudo leer."
+
+    headers = [
+        str(columns[0][0] if len(columns[0]) > 0 else ""),
+        str(columns[1][0] if len(columns[1]) > 0 else ""),
+        "Puerto BOX",
+        str(columns[6][0] if len(columns[6]) > 0 else ""),
+        str(columns[2][0] if len(columns[2]) > 0 else ""),
+        str(columns[3][0] if len(columns[3]) > 0 else ""),
+        str(columns[4][0] if len(columns[4]) > 0 else ""),
+    ]
+
+    max_len = max(len(col) for col in columns)
+    needle = (infra_value or "").strip().upper()
+    rows = []
+
+    for row_idx in range(1, max_len):
+        infra_cell = str(columns[4][row_idx] if row_idx < len(columns[4]) else "")
+        if needle and needle not in infra_cell.upper():
+            continue
+
+        rows.append([
+            str(columns[0][row_idx] if row_idx < len(columns[0]) else ""),
+            str(columns[1][row_idx] if row_idx < len(columns[1]) else ""),
+            str(columns[5][row_idx] if row_idx < len(columns[5]) else ""),
+            str(columns[6][row_idx] if row_idx < len(columns[6]) else ""),
+            str(columns[2][row_idx] if row_idx < len(columns[2]) else ""),
+            str(columns[3][row_idx] if row_idx < len(columns[3]) else ""),
+            str(columns[4][row_idx] if row_idx < len(columns[4]) else ""),
+        ])
+
+    return {"headers": headers, "rows": rows}, None
+
 
 def _cell_from_row(row, idx=None, key=None, default=""):
     if key and key in row:
@@ -1794,28 +1838,18 @@ def port_validation():
             error = "OLT inválido para consulta de estado (permitidos: 1, 2, 11)."
 
     if action == "consultar_infra" and not error:
-
         try:
-            df_nims = worksheet_to_dataframe(spreadsheet, "NIMS")
+            infra_payload, infra_error = query_nims_infra_rows(spreadsheet, infra_value)
         except Exception as exc:
-            df_nims = pd.DataFrame()
-            error = f"No se pudo leer hoja NIMS: {exc}"
+            infra_payload, infra_error = None, f"No se pudo leer hoja NIMS: {exc}"
 
-        if not error:
-            if df_nims.empty or df_nims.shape[1] < 9:
-                error = "La hoja NIMS no tiene columnas suficientes para consulta INFRA."
-            else:
-                filtro = df_nims.iloc[:, 8].astype(str).str.contains(infra_value, case=False, na=False)
-                df_filtrado = df_nims[filtro]
-                if df_filtrado.empty:
-                    info = "No se encontraron coincidencias en NIMS."
-                else:
-                    wanted_idxs = [0, 1, 10, 19, 4, 7, 8]
-                    existing_idxs = [idx for idx in wanted_idxs if idx < df_nims.shape[1]]
-                    infra_table = df_filtrado.iloc[:, existing_idxs].copy().fillna("")
-                    if len(existing_idxs) > 2:
-                        original_col = infra_table.columns[2]
-                        infra_table.rename(columns={original_col: "Puerto BOX"}, inplace=True)
+        if infra_error:
+            error = infra_error
+        elif not infra_payload or not infra_payload.get("rows"):
+            info = "No se encontraron coincidencias en NIMS."
+        else:
+            infra_table = pd.DataFrame(infra_payload["rows"], columns=infra_payload["headers"]).fillna("")
+
 
     if action in {"consultar_estado", "comparar"} and not error:
         try:
