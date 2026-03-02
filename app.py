@@ -133,7 +133,6 @@ def _build_sheet_fingerprint(values):
     return digest.hexdigest()
 
 
-
 def compute_updates_summary(sheet_client):
     worksheets = sheet_client.worksheets()
     averias_fingerprints_by_title = {}
@@ -1284,14 +1283,15 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
     def matches(cell_value, filter_value):
         return normalize(cell_value) == normalize(filter_value)
 
-    if col1_idx is None:
-        rows_after_f1 = rows_all
-    else:
-        rows_after_f1 = [
-            r for r in rows_all
-            if len(r) > col1_idx
-            and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
-        ]
+    extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
+    should_apply_extra_filters = can_apply_extra_filters(selected_tab, user_info=user_info)
+
+    filters1_values = set()
+    filters2_values = set()
+    extra_filter_option_values = {
+        param_name: set() for param_name, _, _ in extra_filter_config
+    }
+
 
     filtered_rows = [
         r for r in rows_after_f1
@@ -1533,6 +1533,7 @@ def index():
         )
     headers = data[0]
     rows_all = data[1:]
+    data = None
     rows_all = apply_user_access_filter(rows_all, headers, user_info, selected_tab=selected_tab)
     total_rows = len(rows_all)
 
@@ -1562,47 +1563,70 @@ def index():
         return normalize(cell_value) == normalize(filter_value)
 
 
-    if col1_idx is None:
-        rows_after_f1 = rows_all
-    else:
-        rows_after_f1 = [
-            r for r in rows_all
-            if len(r) > col1_idx
-            and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
-        ]
+    extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
+    should_apply_extra_filters = can_apply_extra_filters(selected_tab, user_info=user_info)
+
+    filters1_values = set()
+    filters2_values = set()
+    extra_filter_option_values = {
+        param_name: set() for param_name, _, _ in extra_filter_config
+    }
 
 
-    filtered_rows = [
-        r for r in rows_after_f1
-        if not (
+
+    filtered_rows = []
+    for r in rows_all:
+        if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip():
+            filters1_values.add(r[col1_idx])
+
+        passes_filter1 = (
+            col1_idx is None
+            or (
+                len(r) > col1_idx
+                and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+            )
+        )
+        if not passes_filter1:
+            continue
+
+        if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip():
+            filters2_values.add(r[col2_idx])
+
+        if should_apply_extra_filters:
+            for param_name, _, col_idx in extra_filter_config:
+                if len(r) > col_idx and r[col_idx].strip():
+                    extra_filter_option_values[param_name].add(r[col_idx])
+
+        passes_filter2 = not (
+
             use_filter2
             and col2_idx is not None
             and selected_filter2
             and len(r) > col2_idx
             and not matches(r[col2_idx], selected_filter2)
         )
-    ]
-    extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
-    should_apply_extra_filters = can_apply_extra_filters(selected_tab, user_info=user_info)
-    if should_apply_extra_filters:
-        for param_name, _, col_idx in extra_filter_config:
-            filter_value = extra_filters.get(param_name, "")
-            if not filter_value:
-                continue
-            filtered_rows = [
-                r for r in filtered_rows
-                if len(r) > col_idx and matches(r[col_idx], filter_value)
-            ]
+        if not passes_filter2:
+            continue
+
+        passes_extra_filters = True
+        if should_apply_extra_filters:
+            for param_name, _, col_idx in extra_filter_config:
+                filter_value = extra_filters.get(param_name, "")
+                if not filter_value:
+                    continue
+                if len(r) <= col_idx or not matches(r[col_idx], filter_value):
+                    passes_extra_filters = False
+                    break
+
+        if passes_extra_filters:
+            filtered_rows.append(r)
+
 
     extra_filter_options = []
-    should_build_extra_options = can_apply_extra_filters(selected_tab, user_info=user_info)
-    if should_build_extra_options:
-        for param_name, label, col_idx in extra_filter_config:
-            options = sorted({
-                r[col_idx]
-                for r in rows_after_f1
-                if len(r) > col_idx and r[col_idx].strip()
-            })
+    if should_apply_extra_filters:
+        for param_name, label, _ in extra_filter_config:
+            options = sorted(extra_filter_option_values.get(param_name, set()))
+
             if selected_tab == DEPLOYMENT_TAB and param_name == "contrata_filter" and len(options) <= 1:
                 continue
             extra_filter_options.append({
@@ -1612,17 +1636,9 @@ def index():
                 "options": options,
             })
 
-    filters1 = sorted({
-        r[col1_idx]
-        for r in rows_all
-        if col1_idx is not None and len(r) > col1_idx and r[col1_idx].strip()
-    })
+    filters1 = sorted(filters1_values)
+    filters2 = sorted(filters2_values)
 
-    filters2 = sorted({
-        r[col2_idx]
-        for r in rows_after_f1
-        if use_filter2 and col2_idx is not None and len(r) > col2_idx and r[col2_idx].strip()
-    })
 
     # ================= MAPA =================
     coords_info = []
@@ -1761,25 +1777,29 @@ def port_validation():
     estado_table = pd.DataFrame(state.get("estado_table", [])) if state.get("estado_table") else None
     diferencias_table = None
 
-    spreadsheet, spreadsheet_error = open_port_validation_spreadsheet_or_error()
-    if spreadsheet is None:
-        error = f"Error de configuración de Google Sheets (validación): {spreadsheet_error}"
-    else:
+    spreadsheet = None
+    spreadsheet_error = None
+
+    if action in {"consultar_infra", "consultar_estado", "comparar"}:
+        spreadsheet, spreadsheet_error = open_port_validation_spreadsheet_or_error()
+        if spreadsheet is None:
+            error = f"Error de configuración de Google Sheets (validación): {spreadsheet_error}"
+
+    if action in {"consultar_infra", "consultar_estado", "comparar"} and not error:
+        if not site or not box:
+            error = "Completa SITE / OLT / BOX."
+        elif action in {"consultar_estado", "comparar"} and olt not in PORT_VALIDATION_VALID_OLTS:
+            error = "OLT inválido para consulta de estado (permitidos: 1, 2, 11)."
+
+    if action == "consultar_infra" and not error:
+
         try:
             df_nims = worksheet_to_dataframe(spreadsheet, "NIMS")
-            df_tms = worksheet_to_dataframe(spreadsheet, "TMs")
         except Exception as exc:
             df_nims = pd.DataFrame()
-            df_tms = pd.DataFrame()
-            error = f"No se pudieron leer hojas NIMS/TMs: {exc}"
+            error = f"No se pudo leer hoja NIMS: {exc}"
 
-        if action in {"consultar_infra", "consultar_estado", "comparar"} and not error:
-            if not site or not box:
-                error = "Completa SITE / OLT / BOX."
-            elif action == "consultar_estado" and olt not in PORT_VALIDATION_VALID_OLTS:
-                error = "OLT inválido para consulta de estado (permitidos: 1, 2, 11)."
-
-        if action == "consultar_infra" and not error:
+        if not error:
             if df_nims.empty or df_nims.shape[1] < 9:
                 error = "La hoja NIMS no tiene columnas suficientes para consulta INFRA."
             else:
@@ -1795,7 +1815,14 @@ def port_validation():
                         original_col = infra_table.columns[2]
                         infra_table.rename(columns={original_col: "Puerto BOX"}, inplace=True)
 
-        if action == "consultar_estado" and not error:
+    if action in {"consultar_estado", "comparar"} and not error:
+        try:
+            df_tms = worksheet_to_dataframe(spreadsheet, "TMs")
+        except Exception as exc:
+            df_tms = pd.DataFrame()
+            error = f"No se pudo leer hoja TMs: {exc}"
+
+        if not error and action == "consultar_estado":
             estado_resultado, estado_error = obtener_resultado_estado(df_tms, site, olt, box)
             if estado_error:
                 error = estado_error
@@ -1806,7 +1833,7 @@ def port_validation():
                 estado_table = estado_resultado.fillna("")
                 state["referencia_table"] = estado_table.to_dict(orient="records")
 
-        if action == "comparar" and not error:
+        if not error and action == "comparar":
             referencia = pd.DataFrame(state.get("referencia_table", []))
             if referencia.empty:
                 error = "Primero ejecuta 'Consultar ESTADO' para tener referencia."
