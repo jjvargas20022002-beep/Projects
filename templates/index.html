@@ -62,56 +62,6 @@ body{
     gap:8px;
 }
 
-.header-menu{
-    position:relative;
-}
-
-.header-menu-toggle{
-    border:none;
-    background:transparent;
-    color:#1f2937;
-    font-size:16px;
-    line-height:1;
-    padding:2px 4px;
-    cursor:pointer;
-}
-
-.header-menu-list{
-    position:absolute;
-    top:100%;
-    left:0;
-    margin-top:6px;
-    min-width:180px;
-    background:#ffffff;
-    border:1px solid #d1d5db;
-    border-radius:6px;
-    box-shadow:0 8px 18px rgba(0,0,0,.15);
-    display:none;
-    z-index:1500;
-}
-
-.header-menu.open .header-menu-list{
-    display:block;
-}
-
-.header-menu-link{
-    display:block;
-    width:100%;
-    text-align:left;
-    border:none;
-    background:#ffffff;
-    padding:8px 10px;
-    color:#1f2937;
-    text-decoration:none;
-    font-size:13px;
-    cursor:pointer;
-}
-
-.header-menu-link:hover{
-    background:#f3f4f6;
-}
-
-
 
 .header-right{
     display:flex;
@@ -393,12 +343,6 @@ tr:nth-child(even){
 <div class="header">
     <div class="header-title-wrap">
         <h1 class="header-title">Averías/Despliegues FTTH</h1>
-        <div class="header-menu" id="headerMenu">
-            <button class="header-menu-toggle" type="button" aria-label="Abrir menú" aria-expanded="false" onclick="toggleHeaderMenu(event)">▾</button>
-            <div class="header-menu-list">
-                <a class="header-menu-link" href="{{ url_for('port_validation') }}">Validación de puertos</a>
-            </div>
-        </div>
     </div>
     <div class="header-right">
         <span class="user-scope-badge">{{ user_scope_label }}</span>
@@ -912,33 +856,6 @@ function focusCuenta(cuenta){
 
 const INITIAL_UPDATE_SUMMARY = {{ update_summary|tojson }};
 
-
-function toggleHeaderMenu(event){
-    event.stopPropagation();
-    const menu = document.getElementById('headerMenu');
-    if(!menu){
-        return;
-    }
-
-    const isOpen = menu.classList.toggle('open');
-    const button = menu.querySelector('.header-menu-toggle');
-    if(button){
-        button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    }
-}
-
-document.addEventListener('click', function(){
-    const menu = document.getElementById('headerMenu');
-    if(!menu){
-        return;
-    }
-
-    menu.classList.remove('open');
-    const button = menu.querySelector('.header-menu-toggle');
-    if(button){
-        button.setAttribute('aria-expanded', 'false');
-    }
-});
 
 
 
