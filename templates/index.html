@@ -956,6 +956,8 @@ function changeTab(tab){
     document.getElementById("filterForm").submit();
 }
 
+let filterSubmitTimer = null;
+
 function onFilterChange(changedSelect){
     const form = document.getElementById("filterForm");
     if(!form || !changedSelect){
@@ -970,7 +972,13 @@ function onFilterChange(changedSelect){
         }
     }
 
-    form.submit();
+    if(filterSubmitTimer){
+        window.clearTimeout(filterSubmitTimer);
+    }
+
+    filterSubmitTimer = window.setTimeout(() => {
+        form.submit();
+    }, 180);
 }
 
 /* 🔍 FILTRO EN TIEMPO REAL */

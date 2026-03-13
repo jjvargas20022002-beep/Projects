@@ -95,6 +95,64 @@ def get_sheet_or_error():
         init_google_sheet()
     return sheet, SHEET_INIT_ERROR
 
+def _is_google_rate_limited(exc):
+    msg = str(exc or "").upper()
+    return "429" in msg or "RESOURCE_EXHAUSTED" in msg or "RATE LIMIT" in msg
+
+
+TABS_CACHE = {
+    "fetched_at": 0.0,
+    "titles": None,
+}
+TABS_CACHE_TTL_SECONDS = int(os.environ.get("TABS_CACHE_TTL_SECONDS", "20"))
+
+SHEET_VALUES_CACHE = {}
+SHEET_VALUES_CACHE_TTL_SECONDS = int(os.environ.get("SHEET_VALUES_CACHE_TTL_SECONDS", "20"))
+
+
+def get_tabs_titles_cached(sheet_client, force_refresh=False):
+    now = time.time()
+    cached_titles = TABS_CACHE.get("titles")
+    cache_age = now - TABS_CACHE.get("fetched_at", 0.0)
+
+    if not force_refresh and cached_titles and cache_age < TABS_CACHE_TTL_SECONDS:
+        return cached_titles
+
+    try:
+        titles = [ws.title for ws in sheet_client.worksheets()]
+        TABS_CACHE["fetched_at"] = now
+        TABS_CACHE["titles"] = titles
+        return titles
+    except APIError as exc:
+        if _is_google_rate_limited(exc) and cached_titles:
+            return cached_titles
+        raise
+
+
+def get_worksheet_values_cached(sheet_client, tab_name, force_refresh=False):
+    now = time.time()
+    cache_entry = SHEET_VALUES_CACHE.get(tab_name)
+
+    if (
+        not force_refresh
+        and cache_entry
+        and (now - cache_entry.get("fetched_at", 0.0)) < SHEET_VALUES_CACHE_TTL_SECONDS
+    ):
+        return cache_entry.get("values", [])
+
+    try:
+        ws = sheet_client.worksheet(tab_name)
+        values = ws.get_all_values()
+        SHEET_VALUES_CACHE[tab_name] = {
+            "fetched_at": now,
+            "values": values,
+        }
+        return values
+    except APIError as exc:
+        if _is_google_rate_limited(exc) and cache_entry:
+            return cache_entry.get("values", [])
+        raise
+
 
 UPDATE_SUMMARY_CACHE = {
     "fetched_at": 0.0,
@@ -478,8 +536,7 @@ def refresh_estado_cajas():
         return
 
     try:
-        ws_odn = sheet_client.worksheet("PENDIENTES ODN")
-        odn_data = ws_odn.get_all_values()
+        odn_data = get_worksheet_values_cached(sheet_client, "PENDIENTES ODN")
         odn_headers = odn_data[0]
         odn_rows = odn_data[1:]
 
@@ -1051,9 +1108,7 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
     if sheet_client is None:
         return [], []
 
-    ws = sheet_client.worksheet(selected_tab)
-
-    data = ws.get_all_values()
+    data = get_worksheet_values_cached(sheet_client, selected_tab)
     headers = data[0]
     rows_all = data[1:]
     rows_all = apply_user_access_filter(rows_all, headers, user_info, selected_tab=selected_tab)
@@ -1257,7 +1312,7 @@ def index():
         return f"Error de configuración de Google Sheets: {sheet_error}", 503
 
     try:
-        tabs_all = [ws.title for ws in sheet_client.worksheets()]
+        tabs_all = get_tabs_titles_cached(sheet_client)
     except APIError:
         return (
             "Google Sheets excedió la cuota de lectura temporalmente (429) al cargar pestañas. "
@@ -1314,7 +1369,7 @@ def index():
 
 
     try:
-        ws = sheet_client.worksheet(selected_tab)
+        data = get_worksheet_values_cached(sheet_client, selected_tab)
     except APIError:
         return (
             "Google Sheets excedió la cuota de lectura temporalmente (429) al abrir la pestaña. "
@@ -1322,14 +1377,7 @@ def index():
             503,
         )
 
-    try:
-        data = ws.get_all_values()
-    except APIError:
-        return (
-            "Google Sheets excedió la cuota de lectura temporalmente (429). "
-            "Vuelve a intentar en unos segundos.",
-            503,
-        )
+
     headers = data[0]
     rows_all = data[1:]
     data = None
@@ -1575,7 +1623,7 @@ def export_excel():
     if sheet_client is None:
         return f"Error de configuración de Google Sheets: {sheet_error}", 503
 
-    allowed_tabs = get_allowed_tabs([ws.title for ws in sheet_client.worksheets()], user_info)
+    allowed_tabs = get_allowed_tabs(get_tabs_titles_cached(sheet_client), user_info)
 
     if tab not in allowed_tabs:
         return redirect(url_for("index"))
@@ -1638,7 +1686,7 @@ def download_excel():
     if sheet_client is None:
         return f"Error de configuración de Google Sheets: {sheet_error}", 503
 
-    allowed_tabs = get_allowed_tabs([ws.title for ws in sheet_client.worksheets()], user_info)
+    allowed_tabs = get_allowed_tabs(get_tabs_titles_cached(sheet_client), user_info)
 
     if selected_tab not in allowed_tabs:
         return redirect(url_for("index"))
@@ -1655,8 +1703,7 @@ def download_excel():
                 selected_filter2 = "" if is_partner_branch_wide(user_info) else user_info.get("partner", "")
 
 
-    ws = sheet_client.worksheet(selected_tab)
-    data = ws.get_all_values()
+    data = get_worksheet_values_cached(sheet_client, selected_tab)
     headers = data[0]
     rows_all = data[1:]
     rows_all = apply_user_access_filter(rows_all, headers, user_info, selected_tab=selected_tab)
