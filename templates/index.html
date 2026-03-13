@@ -400,14 +400,14 @@ Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
 {% else %}
 
 {% if is_deployment_tab %}
-<select name="filter1" onchange="this.form.submit()">
+<select name="filter1" onchange="onFilterChange(this)">
 <option value="">BRANCH</option>
 {% for f in filters1 %}
 <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
 {% endfor %}
 </select>
 
-<select name="filter2" onchange="this.form.submit()">
+<select name="filter2" onchange="onFilterChange(this)">
 <option value="">SITE</option>
 {% for f in filters2 %}
 <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
@@ -416,7 +416,7 @@ Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
 
 
 {% elif selected_tab == "ONLINE LIMA" %}
-<select name="filter1" onchange="this.form.submit()">
+<select name="filter1" onchange="onFilterChange(this)">
 <option value="">BRANCH</option>
 {% for f in filters1 %}
 <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
@@ -424,14 +424,14 @@ Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
 </select>
 
 {% elif is_branch_tab %}
-<select name="filter1" onchange="this.form.submit()">
+<select name="filter1" onchange="onFilterChange(this)">
 <option value="">BRANCH</option>
 {% for f in filters1 %}
 <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
 {% endfor %}
 </select>
 
-<select name="filter2" onchange="this.form.submit()">
+<select name="filter2" onchange="onFilterChange(this)">
 <option value="">CONTRATA</option>
 {% for f in filters2 %}
 <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
@@ -439,14 +439,14 @@ Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
 </select>
 
 {% else %}
-<select name="filter1" onchange="this.form.submit()">
+<select name="filter1" onchange="onFilterChange(this)">
 <option value="">SITE</option>
 {% for f in filters1 %}
 <option value="{{ f }}" {% if f == selected_filter1 %}selected{% endif %}>{{ f }}</option>
 {% endfor %}
 </select>
 
-<select name="filter2" onchange="this.form.submit()">
+<select name="filter2" onchange="onFilterChange(this)">
 <option value="">Reporte de Contrata</option>
 {% for f in filters2 %}
 <option value="{{ f }}" {% if f == selected_filter2 %}selected{% endif %}>{{ f }}</option>
@@ -455,7 +455,7 @@ Acceso restringido a BRANCH: <b>{{ user_info.branch or 'N/A' }}</b>
 {% endif %}
 
 {% for extra_filter in extra_filter_options %}
-<select name="{{ extra_filter.name }}" onchange="this.form.submit()">
+<select name="{{ extra_filter.name }}" onchange="onFilterChange(this)">
 <option value="">{{ extra_filter.label }}</option>
 {% for option in extra_filter.options %}
 <option value="{{ option }}" {% if option == extra_filter.selected %}selected{% endif %}>{{ option }}</option>
@@ -954,6 +954,23 @@ window.addEventListener("DOMContentLoaded", () => {
 function changeTab(tab){
     document.getElementById("tab_select").value = tab;
     document.getElementById("filterForm").submit();
+}
+
+function onFilterChange(changedSelect){
+    const form = document.getElementById("filterForm");
+    if(!form || !changedSelect){
+        return;
+    }
+
+    const selects = Array.from(form.querySelectorAll('select[name]'));
+    const changedIndex = selects.indexOf(changedSelect);
+    if(changedIndex >= 0){
+        for(let i = changedIndex + 1; i < selects.length; i += 1){
+            selects[i].value = "";
+        }
+    }
+
+    form.submit();
 }
 
 /* 🔍 FILTRO EN TIEMPO REAL */
