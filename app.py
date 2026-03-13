@@ -160,7 +160,7 @@ UPDATE_SUMMARY_CACHE = {
 }
 UPDATE_SUMMARY_TTL_SECONDS = int(os.environ.get("UPDATE_SUMMARY_TTL_SECONDS", "45"))
 UPDATE_MIN_TABS_WITH_ROW_CHANGES = int(os.environ.get("UPDATE_MIN_TABS_WITH_ROW_CHANGES", "3"))
-
+UPDATE_CHANGE_WINDOW_SECONDS = int(os.environ.get("UPDATE_CHANGE_WINDOW_SECONDS", "10"))
 
 
 UPDATE_NOTIFIER_STATE_PATH = Path(
@@ -252,6 +252,10 @@ def get_updates_summary_cached(force_refresh=False):
             "tab_row_counts": {},
             "tabs_with_row_changes": 0,
             "awaiting_full_restore": False,
+            "row_change_window_started_at": 0.0,
+            "row_change_window_changed_tabs": [],
+            "row_change_window_base_counts": {},
+
         }
         return fallback
     fallback = cache_data or {
@@ -263,6 +267,10 @@ def get_updates_summary_cached(force_refresh=False):
         "tab_row_counts": {},
         "tabs_with_row_changes": 0,
         "awaiting_full_restore": False,
+        "row_change_window_started_at": 0.0,
+        "row_change_window_changed_tabs": [],
+        "row_change_window_base_counts": {},
+
     }
 
 
@@ -306,16 +314,62 @@ def get_updates_summary_cached(force_refresh=False):
     )
     summary["tabs_with_row_changes"] = tabs_with_row_changes
 
-    should_update_last_change_at = (
-        not had_previous
-        or full_restore_detected
-        or tabs_with_row_changes >= UPDATE_MIN_TABS_WITH_ROW_CHANGES
-    )
+    previous_last_change_at = previous_summary.get("last_change_at", "")
+    window_started_at = float(previous_summary.get("row_change_window_started_at", 0.0) or 0.0)
+    window_changed_tabs = set(previous_summary.get("row_change_window_changed_tabs", []))
+    window_base_counts = previous_summary.get("row_change_window_base_counts", {})
+    if not isinstance(window_base_counts, dict):
+        window_base_counts = {}
 
-    if should_update_last_change_at:
+
+    if not had_previous or full_restore_detected:
         summary["last_change_at"] = summary.get("generated_at", "")
+        summary["row_change_window_started_at"] = 0.0
+        summary["row_change_window_changed_tabs"] = []
+        summary["row_change_window_base_counts"] = current_tab_rows
+
     else:
-        summary["last_change_at"] = previous_summary.get("last_change_at", "")
+        if not window_base_counts:
+            window_base_counts = previous_tab_rows
+
+        tabs_vs_window_base = {
+            tab_name
+            for tab_name in (set(window_base_counts.keys()) | set(current_tab_rows.keys()))
+            if int(current_tab_rows.get(tab_name, 0) or 0) != int(window_base_counts.get(tab_name, 0) or 0)
+        }
+
+        if tabs_vs_window_base:
+            window_is_expired = (not window_started_at) or ((now - window_started_at) > UPDATE_CHANGE_WINDOW_SECONDS)
+            if window_is_expired:
+                window_started_at = now
+                window_base_counts = previous_tab_rows
+                tabs_vs_window_base = {
+                    tab_name
+                    for tab_name in (set(window_base_counts.keys()) | set(current_tab_rows.keys()))
+                    if int(current_tab_rows.get(tab_name, 0) or 0) != int(window_base_counts.get(tab_name, 0) or 0)
+                }
+                window_changed_tabs = set(tabs_vs_window_base)
+            else:
+                window_changed_tabs.update(tabs_vs_window_base)
+
+            if len(window_changed_tabs) > UPDATE_MIN_TABS_WITH_ROW_CHANGES:
+                summary["last_change_at"] = summary.get("generated_at", "")
+                window_started_at = 0.0
+                window_changed_tabs = set()
+                window_base_counts = current_tab_rows
+            else:
+                summary["last_change_at"] = previous_last_change_at
+        else:
+            if window_started_at and (now - window_started_at) > UPDATE_CHANGE_WINDOW_SECONDS:
+                window_started_at = 0.0
+                window_changed_tabs = set()
+                window_base_counts = current_tab_rows
+            summary["last_change_at"] = previous_last_change_at
+
+        summary["row_change_window_started_at"] = float(window_started_at or 0.0)
+        summary["row_change_window_changed_tabs"] = sorted(window_changed_tabs)
+        summary["row_change_window_base_counts"] = window_base_counts
+
     summary["awaiting_full_restore"] = False
 
 
@@ -337,6 +391,10 @@ def _load_update_notifier_state():
             "tab_row_counts": {},
             "tabs_with_row_changes": 0,
             "awaiting_full_restore": False,
+            "row_change_window_started_at": 0.0,
+            "row_change_window_changed_tabs": [],
+            "row_change_window_base_counts": {},
+
         }
 
     try:
@@ -354,6 +412,10 @@ def _load_update_notifier_state():
             "tab_row_counts": {},
             "tabs_with_row_changes": 0,
             "awaiting_full_restore": False,
+            "row_change_window_started_at": 0.0,
+            "row_change_window_changed_tabs": [],
+            "row_change_window_base_counts": {},
+
         }
 
     if not isinstance(data, dict):
@@ -368,6 +430,10 @@ def _load_update_notifier_state():
             "tab_row_counts": {},
             "tabs_with_row_changes": 0,
             "awaiting_full_restore": False,
+            "row_change_window_started_at": 0.0,
+            "row_change_window_changed_tabs": [],
+            "row_change_window_base_counts": {},
+
         }
 
     return {
@@ -381,6 +447,10 @@ def _load_update_notifier_state():
         "tab_row_counts": data.get("tab_row_counts", {}) if isinstance(data.get("tab_row_counts", {}), dict) else {},
         "tabs_with_row_changes": int(data.get("tabs_with_row_changes", 0) or 0),
         "awaiting_full_restore": bool(data.get("awaiting_full_restore", False)),
+        "row_change_window_started_at": float(data.get("row_change_window_started_at", 0.0) or 0.0),
+        "row_change_window_changed_tabs": data.get("row_change_window_changed_tabs", []) if isinstance(data.get("row_change_window_changed_tabs", []), list) else [],
+        "row_change_window_base_counts": data.get("row_change_window_base_counts", {}) if isinstance(data.get("row_change_window_base_counts", {}), dict) else {},
+
     }
 
 
@@ -397,6 +467,10 @@ def _save_update_notifier_state(summary):
         "tab_row_counts": summary.get("tab_row_counts", {}) if isinstance(summary.get("tab_row_counts", {}), dict) else {},
         "tabs_with_row_changes": int(summary.get("tabs_with_row_changes", 0) or 0),
         "awaiting_full_restore": bool(summary.get("awaiting_full_restore", False)),
+        "row_change_window_started_at": float(summary.get("row_change_window_started_at", 0.0) or 0.0),
+        "row_change_window_changed_tabs": summary.get("row_change_window_changed_tabs", []) if isinstance(summary.get("row_change_window_changed_tabs", []), list) else [],
+        "row_change_window_base_counts": summary.get("row_change_window_base_counts", {}) if isinstance(summary.get("row_change_window_base_counts", {}), dict) else {},
+
     }
     with UPDATE_NOTIFIER_STATE_PATH.open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
