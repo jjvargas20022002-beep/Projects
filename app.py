@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, jsonify
 import gspread
 from gspread.exceptions import APIError
@@ -1077,11 +1081,15 @@ def get_filtered_data(selected_tab, selected_filter1="", selected_filter2="", us
     extra_filter_config = get_extra_filter_config(headers, selected_tab, user_info=user_info)
     should_apply_extra_filters = can_apply_extra_filters(selected_tab, user_info=user_info)
 
-    filters1_values = set()
-    filters2_values = set()
-    extra_filter_option_values = {
-        param_name: set() for param_name, _, _ in extra_filter_config
-    }
+    if col1_idx is None:
+        rows_after_f1 = rows_all
+    else:
+        rows_after_f1 = [
+            r for r in rows_all
+            if len(r) > col1_idx
+            and (not selected_filter1 or matches(r[col1_idx], selected_filter1))
+        ]
+
 
 
     filtered_rows = [
@@ -1729,4 +1737,4 @@ def download_excel():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")), debug=True)
